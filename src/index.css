@@ -8,50 +8,59 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Habi-Check palette (HSL) */
+    --cream: 43 38% 96%;            /* #FCFBF8 */
+    --deep-sage: 110 13% 28%;       /* #3E5240 */
+    --sage-green: 89 28% 49%;       /* #7BA05B */
+    --terracotta: 16 47% 59%;       /* #C97B63 */
+    --warning-red: 0 64% 56%;       /* #D84545 */
+    --input-bg: 40 27% 92%;         /* #F2EEE5 */
+    --muted-line: 40 18% 86%;       /* muted divider */
+    --foreground-ink: 0 0% 16%;     /* #2A2A2A */
+    --muted-ink: 36 9% 47%;         /* #7A7468 */
+
+    --background: var(--cream);
+    --foreground: var(--foreground-ink);
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: var(--foreground-ink);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: var(--foreground-ink);
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: var(--deep-sage);
+    --primary-foreground: var(--cream);
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: var(--sage-green);
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: var(--input-bg);
+    --muted-foreground: var(--muted-ink);
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: var(--terracotta);
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: var(--warning-red);
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: var(--muted-line);
+    --input: var(--input-bg);
+    --ring: var(--deep-sage);
 
-    --radius: 0.5rem;
+    --radius: 1.125rem;
+
+    --shadow-card: 0 10px 30px -12px hsl(var(--deep-sage) / 0.18);
+    --shadow-fab: 0 14px 30px -8px hsl(var(--deep-sage) / 0.45);
+    --gradient-success: linear-gradient(135deg, hsl(89 28% 49%), hsl(110 13% 36%));
+    --gradient-fail: linear-gradient(135deg, hsl(0 64% 56%), hsl(16 47% 59%));
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -101,5 +110,13 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .habi-card {
+    @apply bg-card rounded-3xl p-5;
+    box-shadow: var(--shadow-card);
   }
 }
