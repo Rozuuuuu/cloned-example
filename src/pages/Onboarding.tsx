@@ -27,7 +27,7 @@ const Onboarding = () => {
 
   const handleContinue = () => {
     localStorage.setItem("hulas_level", selected);
-    navigate("/dashboard");
+    navigate("/scanner");
   };
 
   return (

@@ -15,12 +15,14 @@ const Login = () => {
       return;
     }
     localStorage.setItem("habi_user", email);
-    navigate("/onboarding");
+    localStorage.setItem("is_logged_in", "true");
+    navigate("/dashboard");
   };
 
   const handleGuest = () => {
     localStorage.setItem("habi_user", "guest");
-    navigate("/onboarding");
+    localStorage.setItem("is_guest", "true");
+    navigate("/dashboard");
   };
 
   return (
