@@ -10,6 +10,8 @@ import Onboarding from "./pages/Onboarding.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Scanner from "./pages/Scanner.tsx";
 import Result from "./pages/Result.tsx";
+import Closet from "./pages/Closet.tsx";
+import EcoMap from "./pages/EcoMap.tsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/scanner" element={<Scanner />} />
           <Route path="/result" element={<Result />} />
+          <Route path="/closet" element={<Closet />} />
+          <Route path="/eco-map" element={<EcoMap />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
