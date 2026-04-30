@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
-type HulasLevel = "pawisin" | "normal";
+type HulasLevel = "pawisin" | "normal" | "chill";
 
 const options: { value: HulasLevel; emoji: string; title: string; subtitle: string }[] = [
   {
@@ -14,8 +14,14 @@ const options: { value: HulasLevel; emoji: string; title: string; subtitle: stri
   {
     value: "normal",
     emoji: "😊",
-    title: "Normal",
+    title: "Normal Lang",
     subtitle: "I'm comfortable in most weather and fabrics.",
+  },
+  {
+    value: "chill",
+    emoji: "🧊",
+    title: "Chill Lang",
+    subtitle: "I stay cool naturally — cotton or linen blends work great.",
   },
 ];
 
