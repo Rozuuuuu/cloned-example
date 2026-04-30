@@ -6,13 +6,14 @@ import { buildFabricResult } from "@/lib/habi";
 const Result = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const resultType = (params.get("type") === "fail" ? "fail" : "success") as "success" | "fail";
+  // ResultViewModel treats anything other than "success" as a warning/fail.
+  const raw = params.get("type") ?? "success";
+  const isSuccess = raw === "success";
+  const resultType = isSuccess ? "success" : "fail";
 
   const fabric = useMemo(() => buildFabricResult(resultType), [resultType]);
-  const gradient =
-    resultType === "success" ? "var(--gradient-success)" : "var(--gradient-fail)";
-  const gradeColor =
-    resultType === "success" ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
+  const gradient = isSuccess ? "var(--gradient-success)" : "var(--gradient-fail)";
+  const gradeColor = isSuccess ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
 
   return (
     <div className="min-h-screen text-white" style={{ background: gradient }}>
