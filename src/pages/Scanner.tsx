@@ -10,7 +10,7 @@ const Scanner = () => {
   const [flashOn, setFlashOn] = useState(false);
   const [statusText, setStatusText] = useState("Point camera at fabric weave");
 
-  const analyze = () => {
+  const analyze = (imagePath?: string) => {
     setIsScanning(true);
     setStatusText("Analyzing fiber structure...");
     // Mock analyzer: 50/50 like FabricAnalyzerService
@@ -23,6 +23,7 @@ const Scanner = () => {
           fabricName: "Premium Linen",
           grade: "A+",
           fiberType: "100% Natural Linen",
+          imagePath,
         });
         navigate("/result?type=success");
       } else {
@@ -30,15 +31,25 @@ const Scanner = () => {
           fabricName: "Polyester Blend",
           grade: "F-",
           fiberType: "85% Polyester, 15% Rayon",
+          imagePath,
         });
-        navigate("/result?type=fail");
+        // ScannerViewModel passes "warning" for non-success; ResultViewModel
+        // treats anything other than "success" as the fail/warning state.
+        navigate("/result?type=warning");
       }
+      // ScannerViewModel.ResetState resets status text after navigation
+      setIsScanning(false);
+      setStatusText("Point camera at fabric weave");
     }, 2500);
   };
 
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.length) return;
-    analyze();
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    analyze(url);
+    // allow re-selecting the same file later
+    e.target.value = "";
   };
 
   return (
