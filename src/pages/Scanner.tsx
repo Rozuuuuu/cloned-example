@@ -151,7 +151,7 @@ const Scanner = () => {
           {/* Demo analyze (since browser camera in preview is unreliable) */}
           <button
             disabled={isScanning}
-            onClick={analyze}
+            onClick={() => analyze()}
             className="flex h-14 items-center justify-center rounded-2xl bg-white/15 text-2xl disabled:opacity-50"
             aria-label="Demo analyze"
           >
