@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   fabricAdvice,
   getHulas,
+  getHulasPersona,
   getRecentScans,
   getWeather,
   humidityLabel,
@@ -17,14 +18,11 @@ const Dashboard = () => {
   const hulas = getHulas();
 
   useEffect(() => {
-    setScans(getRecentScans());
+    // Mirror DashboardViewModel: take top 5 newest
+    setScans(getRecentScans().slice(0, 5));
   }, []);
 
-  const hulasLabel = hulas === "pawisin" ? "Pawisin Profile" : "Normal Profile";
-  const hulasAdvice =
-    hulas === "pawisin"
-      ? "We'll favor breathable, moisture-wicking natural fabrics for you."
-      : "Balanced fabric recommendations tailored to the day's weather.";
+  const { label: hulasLabel, advice: hulasAdvice } = getHulasPersona(hulas);
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", {
@@ -152,19 +150,31 @@ const Dashboard = () => {
             📷 &nbsp;Start Fabric Scan
           </button>
           <div className="grid grid-cols-3 bg-white pb-6 pt-9">
-            <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              className="flex flex-col items-center gap-1"
+            >
               <span className="text-2xl">🏠</span>
               <span className="text-[10px] font-semibold text-deep-sage">Home</span>
               <span className="h-1 w-1 rounded-full bg-deep-sage" />
-            </div>
-            <div className="flex flex-col items-center gap-1">
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/closet")}
+              className="flex flex-col items-center gap-1"
+            >
               <span className="text-2xl">👗</span>
               <span className="text-[10px] text-[#B0A99A]">My Closet</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/eco-map")}
+              className="flex flex-col items-center gap-1"
+            >
               <span className="text-2xl">🗺️</span>
               <span className="text-[10px] text-[#B0A99A]">Eco-Map</span>
-            </div>
+            </button>
           </div>
         </div>
       </div>

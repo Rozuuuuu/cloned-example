@@ -1,4 +1,4 @@
-export type HulasLevel = "pawisin" | "normal";
+export type HulasLevel = "pawisin" | "normal" | "chill";
 
 export interface ScanRecord {
   id: string;
@@ -6,6 +6,7 @@ export interface ScanRecord {
   grade: string;
   fiberType: string;
   scannedAt: string;
+  imagePath?: string;
 }
 
 export interface FabricData {
@@ -14,6 +15,7 @@ export interface FabricData {
   fiberType: string;
   breathability: number;
   sustainability: number;
+  description?: string;
   personalMessage: string;
   climateAlert?: string;
   washTips: string[];
@@ -65,12 +67,13 @@ export const addScan = (record: Omit<ScanRecord, "id" | "scannedAt">) => {
     id: crypto.randomUUID(),
     scannedAt: new Date().toISOString(),
   };
-  const updated = [next, ...scans].slice(0, 10);
+  // Keep newest first (matches DatabaseService.GetScansAsync ORDER BY ScannedAt DESC)
+  const updated = [next, ...scans].slice(0, 50);
   localStorage.setItem("habi_scans", JSON.stringify(updated));
   return next;
 };
 
-export const buildFabricResult = (resultType: "success" | "fail"): FabricData => {
+export const buildFabricResult = (resultType: "success" | "fail" | "warning"): FabricData => {
   const hulas = getHulas();
   if (resultType === "success") {
     return {
@@ -79,9 +82,10 @@ export const buildFabricResult = (resultType: "success" | "fail"): FabricData =>
       fiberType: "100% Natural Linen",
       breathability: 95,
       sustainability: 90,
+      description: "High-grade natural fiber with excellent breathability.",
       personalMessage:
         hulas === "pawisin"
-          ? "Perfect! Super breathable for Cebu humidity. Goodbye sticky feeling!"
+          ? "Perfect! Super breathable ito para sa Cebu humidity. Goodbye sticky feeling!"
           : "Great choice! This natural fabric will keep you comfortable all day.",
       washTips: ["Cold water wash only", "Hang dry in shade", "Iron while damp"],
       resaleValue: "₱450 – ₱850",
@@ -95,17 +99,43 @@ export const buildFabricResult = (resultType: "success" | "fail"): FabricData =>
     fiberType: "85% Polyester, 15% Rayon",
     breathability: 25,
     sustainability: 15,
+    description: "Synthetic fabric with poor breathability.",
     personalMessage:
       hulas === "pawisin"
-        ? "Warning! This feels like a plastic bag in the heat. High risk of sun-smell!"
+        ? "Babala! Plastic bag ang feel nito sa init. Mataas ang risk ng amoy-araw!"
         : "Not ideal for our tropical climate. Poor airflow and moisture-wicking.",
     climateAlert:
-      "At 32°C in Cebu, this fabric will trap sweat and you'll smell of sun before noon.",
+      "Sa 32°C ng Cebu, itrap ng fabric na ito ang sweat at magiging amoy-araw ka bago mag-tanghali.",
     washTips: ["Wash separately", "Use fabric softener", "Low heat or air dry"],
     resaleValue: "₱80 – ₱150",
     upcyclingIdea: '"Basahan" — cleaning cloth for floors or windows.',
     isSuccess: false,
   };
+};
+
+/** Mirrors DashboardViewModel switch on hulas_level. */
+export const getHulasPersona = (
+  hulas: HulasLevel
+): { label: string; advice: string } => {
+  switch (hulas) {
+    case "chill":
+      return {
+        label: "Chill Lang Profile",
+        advice:
+          "You stay cool naturally! Cotton or linen blends work great for you.",
+      };
+    case "normal":
+      return {
+        label: "Normal Lang Profile",
+        advice: "Breathable cotton or bamboo blends are your best friend.",
+      };
+    default:
+      return {
+        label: "Pawisin Profile",
+        advice:
+          "Sa 32°C ng Cebu, stick to 100% linen or cotton. Iwasan ang polyester!",
+      };
+  }
 };
 
 export interface WeatherInfo {
