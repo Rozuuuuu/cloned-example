@@ -14,7 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string
+          hulas_level: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          hulas_level?: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          hulas_level?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      scans: {
+        Row: {
+          fabric_name: string
+          fiber_type: string
+          grade: string
+          id: string
+          image_path: string | null
+          scanned_at: string
+          user_id: string
+        }
+        Insert: {
+          fabric_name: string
+          fiber_type: string
+          grade: string
+          id?: string
+          image_path?: string | null
+          scanned_at?: string
+          user_id: string
+        }
+        Update: {
+          fabric_name?: string
+          fiber_type?: string
+          grade?: string
+          id?: string
+          image_path?: string | null
+          scanned_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
