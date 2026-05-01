@@ -1,64 +1,69 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { addScan, getHulas } from "@/lib/habi";
+import { saveScan } from "@/lib/habi";
+
+type ScanState = "idle" | "analyzing";
 
 const Scanner = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isScanning, setIsScanning] = useState(false);
+  const [state, setState] = useState<ScanState>("idle");
   const [flashOn, setFlashOn] = useState(false);
   const [statusText, setStatusText] = useState("Point camera at fabric weave");
 
-  const analyze = (imagePath?: string) => {
-    setIsScanning(true);
+  // Mirrors ScannerViewModel.ProcessPhotoAsync — analyze, save, then navigate.
+  const processPhoto = async (file?: File | null) => {
+    if (state === "analyzing") return;
+    setState("analyzing");
     setStatusText("Analyzing fiber structure...");
-    // Mock analyzer: 50/50 like FabricAnalyzerService
+
+    // Simulated FabricAnalyzerService delay (2.5s)
+    await new Promise((r) => setTimeout(r, 2500));
+
     const isNatural = Math.random() > 0.5;
-    setTimeout(() => {
-      const hulas = getHulas();
-      void hulas;
-      if (isNatural) {
-        addScan({
-          fabricName: "Premium Linen",
-          grade: "A+",
-          fiberType: "100% Natural Linen",
-          imagePath,
-        });
-        navigate("/result?type=success");
-      } else {
-        addScan({
-          fabricName: "Polyester Blend",
-          grade: "F-",
-          fiberType: "85% Polyester, 15% Rayon",
-          imagePath,
-        });
-        // ScannerViewModel passes "warning" for non-success; ResultViewModel
-        // treats anything other than "success" as the fail/warning state.
-        navigate("/result?type=warning");
-      }
-      // ScannerViewModel.ResetState resets status text after navigation
-      setIsScanning(false);
-      setStatusText("Point camera at fabric weave");
-    }, 2500);
+    const fabric = isNatural
+      ? { fabricName: "Premium Linen", grade: "A+", fiberType: "100% Natural Linen" }
+      : { fabricName: "Polyester Blend", grade: "F-", fiberType: "85% Polyester, 15% Rayon" };
+
+    const saved = await saveScan({ ...fabric, imageFile: file ?? null });
+
+    // ScannerViewModel always resets state in `finally` block.
+    setState("idle");
+    setStatusText("Point camera at fabric weave");
+
+    const type = isNatural ? "success" : "warning";
+    navigate(`/result?type=${type}${saved ? `&id=${saved.id}` : ""}`);
   };
 
   const handleFileChosen = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    analyze(url);
-    // allow re-selecting the same file later
+    const file = e.target.files?.[0] ?? null;
     e.target.value = "";
+    if (!file) return;
+    void processPhoto(file);
   };
+
+  const openCamera = () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.setAttribute("capture", "environment");
+    fileInputRef.current.click();
+  };
+
+  const openGallery = () => {
+    if (!fileInputRef.current) return;
+    fileInputRef.current.removeAttribute("capture");
+    fileInputRef.current.click();
+  };
+
+  const isAnalyzing = state === "analyzing";
 
   return (
     <div className="min-h-screen bg-[#0E1410] text-cream">
-      {/* Top bar */}
+      {/* Top bar — back / title / flash toggle (FlashOn) */}
       <div className="flex items-center justify-between px-5 pt-12">
         <button
           onClick={() => navigate(-1)}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl"
+          disabled={isAnalyzing}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl disabled:opacity-50"
           aria-label="Back"
         >
           ←
@@ -66,19 +71,25 @@ const Scanner = () => {
         <span className="font-semibold">Fabric Scanner</span>
         <button
           onClick={() => setFlashOn((v) => !v)}
-          className={`flex h-11 w-11 items-center justify-center rounded-full text-xl ${
-            flashOn ? "bg-terracotta text-white" : "bg-white/20"
+          disabled={isAnalyzing}
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-xl transition-colors disabled:opacity-50 ${
+            flashOn ? "bg-terracotta text-white shadow-lg" : "bg-white/20"
           }`}
           aria-label="Toggle flash"
+          aria-pressed={flashOn}
         >
           ⚡
         </button>
       </div>
 
-      {/* Viewfinder */}
-      <div className="relative mx-5 mt-6 aspect-[3/4] overflow-hidden rounded-3xl border-2 border-white/20 bg-gradient-to-br from-[#1f2a22] to-[#0E1410]">
+      {/* Viewfinder — flash overlay reflects FlashOn state */}
+      <div
+        className={`relative mx-5 mt-6 aspect-[3/4] overflow-hidden rounded-3xl border-2 transition-all ${
+          flashOn ? "border-terracotta/60 shadow-[0_0_40px_hsl(var(--terracotta)/0.4)]" : "border-white/20"
+        } bg-gradient-to-br from-[#1f2a22] to-[#0E1410]`}
+      >
+        {flashOn && <div className="pointer-events-none absolute inset-0 bg-white/10" />}
         <div className="absolute inset-6 rounded-2xl border-2 border-dashed border-sage-green/60" />
-        {/* Corner brackets */}
         {[
           "left-4 top-4 border-l-2 border-t-2",
           "right-4 top-4 border-r-2 border-t-2",
@@ -94,9 +105,13 @@ const Scanner = () => {
           </div>
         </div>
 
-        {isScanning && (
+        {isAnalyzing && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
-            <div className="text-center">
+            {/* Animated scanline overlay */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute inset-x-0 h-[2px] animate-scanline bg-sage-green/80 shadow-[0_0_12px_hsl(var(--sage-green))]" />
+            </div>
+            <div className="relative text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-sage-green border-t-transparent" />
               <p className="mt-3 font-semibold">Analyzing fiber structure...</p>
               <p className="mt-1 text-xs opacity-70">This usually takes a moment</p>
@@ -105,42 +120,30 @@ const Scanner = () => {
         )}
       </div>
 
-      {/* Hidden file input for gallery picker */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={handleFileChosen}
       />
 
       <div className="px-5 pb-10 pt-6">
         <div className="grid grid-cols-3 items-center gap-3">
-          {/* Gallery */}
+          {/* PickFromGalleryAsync */}
           <button
-            disabled={isScanning}
-            onClick={() => {
-              if (fileInputRef.current) {
-                fileInputRef.current.removeAttribute("capture");
-                fileInputRef.current.click();
-              }
-            }}
+            disabled={isAnalyzing}
+            onClick={openGallery}
             className="flex h-14 items-center justify-center rounded-2xl bg-white/15 text-2xl disabled:opacity-50"
             aria-label="Pick from gallery"
           >
             🖼️
           </button>
 
-          {/* Capture / scan */}
+          {/* CaptureAndScanAsync */}
           <button
-            disabled={isScanning}
-            onClick={() => {
-              if (fileInputRef.current) {
-                fileInputRef.current.setAttribute("capture", "environment");
-                fileInputRef.current.click();
-              }
-            }}
+            disabled={isAnalyzing}
+            onClick={openCamera}
             className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream bg-sage-green text-3xl text-white disabled:opacity-50"
             style={{ boxShadow: "var(--shadow-fab)" }}
             aria-label="Capture photo"
@@ -148,10 +151,10 @@ const Scanner = () => {
             📸
           </button>
 
-          {/* Demo analyze (since browser camera in preview is unreliable) */}
+          {/* Demo analyze (browser camera unreliable in preview) */}
           <button
-            disabled={isScanning}
-            onClick={() => analyze()}
+            disabled={isAnalyzing}
+            onClick={() => void processPhoto(null)}
             className="flex h-14 items-center justify-center rounded-2xl bg-white/15 text-2xl disabled:opacity-50"
             aria-label="Demo analyze"
           >

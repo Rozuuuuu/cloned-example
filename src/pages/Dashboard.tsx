@@ -2,25 +2,37 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   fabricAdvice,
-  getHulas,
   getHulasPersona,
   getRecentScans,
+  getScanImageUrl,
   getWeather,
   humidityLabel,
+  loadHulasFromProfile,
+  type HulasLevel,
   type ScanRecord,
   type WeatherInfo,
 } from "@/lib/habi";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const [weather] = useState<WeatherInfo>(getWeather());
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [scans, setScans] = useState<ScanRecord[]>([]);
-  const hulas = getHulas();
+  const [hulas, setHulasState] = useState<HulasLevel>("pawisin");
 
+  // Mirrors DashboardViewModel.LoadAsync — gate on auth, then load weather, profile, top-5 scans.
   useEffect(() => {
-    // Mirror DashboardViewModel: take top 5 newest
-    setScans(getRecentScans().slice(0, 5));
-  }, []);
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      setWeather(await getWeather("Consolacion, Cebu"));
+      setHulasState(await loadHulasFromProfile());
+      setScans(await getRecentScans(5));
+    })();
+  }, [navigate]);
 
   const { label: hulasLabel, advice: hulasAdvice } = getHulasPersona(hulas);
 
@@ -30,6 +42,14 @@ const Dashboard = () => {
       day: "2-digit",
       year: "numeric",
     });
+
+  if (!weather) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-cream text-deep-sage">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream">
@@ -46,7 +66,6 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Weather card */}
         <div className="mt-4 rounded-3xl border border-white/20 bg-white/10 p-4">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
             <div className="flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-terracotta/40 text-2xl">
@@ -85,7 +104,6 @@ const Dashboard = () => {
 
       {/* Content */}
       <div className="space-y-4 px-5 pb-40 pt-5">
-        {/* Fabric persona card */}
         <div className="rounded-3xl bg-deep-sage p-5 text-cream">
           <div className="flex items-center gap-2">
             <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
@@ -103,29 +121,46 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Recent scans */}
         <div className="habi-card">
           <div className="flex items-center justify-between">
             <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
             <span className="text-sm font-semibold text-sage-green">See all</span>
           </div>
-          <div className="mt-2 divide-y divide-border">
-            {scans.map((s) => (
-              <div key={s.id} className="flex items-center gap-3 py-2.5">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sage-green text-[13px] font-bold text-white">
-                  {s.grade}
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm font-semibold text-foreground">{s.fabricName}</div>
-                  <div className="text-xs text-muted-foreground">{formatDate(s.scannedAt)}</div>
-                </div>
-                <span className="text-lg text-muted-foreground">›</span>
-              </div>
-            ))}
-          </div>
+          {scans.length === 0 ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              No scans yet. Tap “Start Fabric Scan” to add your first item.
+            </p>
+          ) : (
+            <div className="mt-2 divide-y divide-border">
+              {scans.map((s) => {
+                const img = getScanImageUrl(s.imagePath);
+                return (
+                  <div key={s.id} className="flex items-center gap-3 py-2.5">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={s.fabricName}
+                        className="h-11 w-11 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sage-green text-[13px] font-bold text-white">
+                        {s.grade}
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold text-foreground">{s.fabricName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {s.fiberType} · {formatDate(s.scannedAt)}
+                      </div>
+                    </div>
+                    <span className="text-lg text-muted-foreground">›</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Eco insights */}
         <div className="rounded-3xl bg-deep-sage p-5 text-cream">
           <div className="flex items-center gap-2">
             <span className="text-lg">🌿</span>
@@ -139,44 +174,15 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Bottom bar + FAB */}
-      <div className="fixed inset-x-0 bottom-0 z-20">
-        <div className="relative">
-          <button
-            onClick={() => navigate("/scanner")}
-            className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-full border-[3px] border-cream bg-deep-sage px-7 py-3.5 text-[15px] font-bold text-cream"
-            style={{ boxShadow: "var(--shadow-fab)" }}
-          >
-            📷 &nbsp;Start Fabric Scan
-          </button>
-          <div className="grid grid-cols-3 bg-white pb-6 pt-9">
-            <button
-              type="button"
-              onClick={() => navigate("/dashboard")}
-              className="flex flex-col items-center gap-1"
-            >
-              <span className="text-2xl">🏠</span>
-              <span className="text-[10px] font-semibold text-deep-sage">Home</span>
-              <span className="h-1 w-1 rounded-full bg-deep-sage" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/closet")}
-              className="flex flex-col items-center gap-1"
-            >
-              <span className="text-2xl">👗</span>
-              <span className="text-[10px] text-[#B0A99A]">My Closet</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/eco-map")}
-              className="flex flex-col items-center gap-1"
-            >
-              <span className="text-2xl">🗺️</span>
-              <span className="text-[10px] text-[#B0A99A]">Eco-Map</span>
-            </button>
-          </div>
-        </div>
+      {/* FAB only — repo Shell has a single Scanner entry, no Closet/Eco-Map. */}
+      <div className="fixed inset-x-0 bottom-0 z-20 px-5 pb-6 pt-2">
+        <button
+          onClick={() => navigate("/scanner")}
+          className="mx-auto block w-full max-w-md rounded-full border-[3px] border-cream bg-deep-sage px-7 py-4 text-[15px] font-bold text-cream"
+          style={{ boxShadow: "var(--shadow-fab)" }}
+        >
+          📷 &nbsp;Start Fabric Scan
+        </button>
       </div>
     </div>
   );

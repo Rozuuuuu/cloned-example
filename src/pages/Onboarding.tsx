@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-
-type HulasLevel = "pawisin" | "normal" | "chill";
+import { setHulas, type HulasLevel } from "@/lib/habi";
 
 const options: { value: HulasLevel; emoji: string; title: string; subtitle: string }[] = [
   {
@@ -30,9 +29,12 @@ const Onboarding = () => {
   const [selected, setSelected] = useState<HulasLevel>(
     (localStorage.getItem("hulas_level") as HulasLevel) || "pawisin"
   );
+  const [busy, setBusy] = useState(false);
 
-  const handleContinue = () => {
-    localStorage.setItem("hulas_level", selected);
+  // Mirrors OnboardingViewModel.ContinueAsync — saves preference then opens Scanner.
+  const handleContinue = async () => {
+    setBusy(true);
+    await setHulas(selected);
     navigate("/scanner");
   };
 
@@ -57,9 +59,7 @@ const Onboarding = () => {
               type="button"
               onClick={() => setSelected(opt.value)}
               className={`flex w-full items-center gap-4 rounded-3xl border-2 p-4 text-left transition-all ${
-                active
-                  ? "border-deep-sage bg-card"
-                  : "border-transparent bg-card/70"
+                active ? "border-deep-sage bg-card" : "border-transparent bg-card/70"
               }`}
               style={active ? { boxShadow: "var(--shadow-card)" } : undefined}
             >
@@ -82,9 +82,10 @@ const Onboarding = () => {
 
       <Button
         onClick={handleContinue}
+        disabled={busy}
         className="mt-8 h-14 w-full rounded-2xl bg-deep-sage text-base font-bold text-cream hover:bg-deep-sage/90"
       >
-        Continue
+        {busy ? "..." : "Continue"}
       </Button>
     </div>
   );
