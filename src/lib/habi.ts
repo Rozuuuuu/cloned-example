@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export type HulasLevel = "pawisin" | "normal" | "chill";
 
 export interface ScanRecord {
@@ -6,7 +8,7 @@ export interface ScanRecord {
   grade: string;
   fiberType: string;
   scannedAt: string;
-  imagePath?: string;
+  imagePath?: string | null;
 }
 
 export interface FabricData {
@@ -24,65 +26,118 @@ export interface FabricData {
   isSuccess: boolean;
 }
 
+const HULAS_KEY = "hulas_level";
+
 export const getHulas = (): HulasLevel =>
-  (localStorage.getItem("hulas_level") as HulasLevel) || "pawisin";
+  (localStorage.getItem(HULAS_KEY) as HulasLevel) || "pawisin";
 
-export const getRecentScans = (): ScanRecord[] => {
-  try {
-    const raw = localStorage.getItem("habi_scans");
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  // seed with sample data so the dashboard isn't empty
-  const seed: ScanRecord[] = [
-    {
-      id: "1",
-      fabricName: "Premium Linen",
-      grade: "A+",
-      fiberType: "100% Natural Linen",
-      scannedAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
-    },
-    {
-      id: "2",
-      fabricName: "Cotton Blend",
-      grade: "B",
-      fiberType: "70% Cotton, 30% Polyester",
-      scannedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-    },
-    {
-      id: "3",
-      fabricName: "Polyester Shirt",
-      grade: "F-",
-      fiberType: "100% Polyester",
-      scannedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-    },
-  ];
-  localStorage.setItem("habi_scans", JSON.stringify(seed));
-  return seed;
+export const setHulas = async (value: HulasLevel) => {
+  localStorage.setItem(HULAS_KEY, value);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase.from("profiles").upsert({ id: user.id, hulas_level: value });
+  }
 };
 
-export const addScan = (record: Omit<ScanRecord, "id" | "scannedAt">) => {
-  const scans = getRecentScans();
-  const next: ScanRecord = {
-    ...record,
-    id: crypto.randomUUID(),
-    scannedAt: new Date().toISOString(),
+export const loadHulasFromProfile = async (): Promise<HulasLevel> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return getHulas();
+  const { data } = await supabase
+    .from("profiles")
+    .select("hulas_level")
+    .eq("id", user.id)
+    .maybeSingle();
+  const level = (data?.hulas_level as HulasLevel) || getHulas();
+  localStorage.setItem(HULAS_KEY, level);
+  return level;
+};
+
+/** Mirrors DatabaseService.GetScansAsync — newest first, optionally limited. */
+export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
+  const query = supabase
+    .from("scans")
+    .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
+    .order("scanned_at", { ascending: false });
+  const { data, error } = limit ? await query.limit(limit) : await query;
+  if (error || !data) return [];
+  return data.map((r) => ({
+    id: r.id as string,
+    fabricName: r.fabric_name as string,
+    grade: r.grade as string,
+    fiberType: r.fiber_type as string,
+    scannedAt: r.scanned_at as string,
+    imagePath: (r.image_path as string | null) ?? undefined,
+  }));
+};
+
+export interface NewScan {
+  fabricName: string;
+  grade: string;
+  fiberType: string;
+  imageFile?: File | Blob | null;
+}
+
+/** Mirrors ScannerViewModel.ProcessPhotoAsync save step. */
+export const saveScan = async (record: NewScan): Promise<ScanRecord | null> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  let imagePath: string | null = null;
+  if (record.imageFile) {
+    const ext =
+      record.imageFile instanceof File && record.imageFile.name.includes(".")
+        ? record.imageFile.name.split(".").pop()
+        : "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("scan-images")
+      .upload(path, record.imageFile, { upsert: false, contentType: (record.imageFile as File).type || "image/jpeg" });
+    if (!upErr) imagePath = path;
+  }
+
+  const { data, error } = await supabase
+    .from("scans")
+    .insert({
+      user_id: user.id,
+      fabric_name: record.fabricName,
+      grade: record.grade,
+      fiber_type: record.fiberType,
+      image_path: imagePath,
+    })
+    .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
+    .single();
+  if (error || !data) return null;
+  return {
+    id: data.id as string,
+    fabricName: data.fabric_name as string,
+    grade: data.grade as string,
+    fiberType: data.fiber_type as string,
+    scannedAt: data.scanned_at as string,
+    imagePath: (data.image_path as string | null) ?? undefined,
   };
-  // Keep newest first (matches DatabaseService.GetScansAsync ORDER BY ScannedAt DESC)
-  const updated = [next, ...scans].slice(0, 50);
-  localStorage.setItem("habi_scans", JSON.stringify(updated));
-  return next;
 };
 
+/** Returns a public URL for a stored scan image (bucket is public). */
+export const getScanImageUrl = (path?: string | null): string | undefined => {
+  if (!path) return undefined;
+  const { data } = supabase.storage.from("scan-images").getPublicUrl(path);
+  return data.publicUrl;
+};
+
+/**
+ * Mirrors ResultViewModel.OnResultTypeChanged exactly.
+ * resultType "success" → A+ Premium Linen, anything else → F- Polyester Blend.
+ */
 export const buildFabricResult = (resultType: "success" | "fail" | "warning"): FabricData => {
+  const isSuccess = resultType === "success";
   const hulas = getHulas();
-  if (resultType === "success") {
+  if (isSuccess) {
     return {
       name: "Premium Linen",
       grade: "A+",
       fiberType: "100% Natural Linen",
       breathability: 95,
       sustainability: 90,
-      description: "High-grade natural fiber with excellent breathability.",
       personalMessage:
         hulas === "pawisin"
           ? "Perfect! Super breathable ito para sa Cebu humidity. Goodbye sticky feeling!"
@@ -99,7 +154,6 @@ export const buildFabricResult = (resultType: "success" | "fail" | "warning"): F
     fiberType: "85% Polyester, 15% Rayon",
     breathability: 25,
     sustainability: 15,
-    description: "Synthetic fabric with poor breathability.",
     personalMessage:
       hulas === "pawisin"
         ? "Babala! Plastic bag ang feel nito sa init. Mataas ang risk ng amoy-araw!"
@@ -108,12 +162,12 @@ export const buildFabricResult = (resultType: "success" | "fail" | "warning"): F
       "Sa 32°C ng Cebu, itrap ng fabric na ito ang sweat at magiging amoy-araw ka bago mag-tanghali.",
     washTips: ["Wash separately", "Use fabric softener", "Low heat or air dry"],
     resaleValue: "₱80 – ₱150",
-    upcyclingIdea: '"Basahan" — cleaning cloth for floors or windows.',
+    upcyclingIdea: '"Basahan" – cleaning cloth for floors or windows.',
     isSuccess: false,
   };
 };
 
-/** Mirrors DashboardViewModel switch on hulas_level. */
+/** Mirrors DashboardViewModel switch. */
 export const getHulasPersona = (
   hulas: HulasLevel
 ): { label: string; advice: string } => {
@@ -121,8 +175,7 @@ export const getHulasPersona = (
     case "chill":
       return {
         label: "Chill Lang Profile",
-        advice:
-          "You stay cool naturally! Cotton or linen blends work great for you.",
+        advice: "You stay cool naturally! Cotton or linen blends work great for you.",
       };
     case "normal":
       return {
@@ -132,8 +185,7 @@ export const getHulasPersona = (
     default:
       return {
         label: "Pawisin Profile",
-        advice:
-          "Sa 32°C ng Cebu, stick to 100% linen or cotton. Iwasan ang polyester!",
+        advice: "Sa 32°C ng Cebu, stick to 100% linen or cotton. Iwasan ang polyester!",
       };
   }
 };
@@ -147,14 +199,20 @@ export interface WeatherInfo {
   condition: string;
 }
 
-export const getWeather = (): WeatherInfo => ({
-  location: "Consolacion, Cebu",
-  temperature: 32,
-  feelsLike: 37,
-  humidity: 85,
-  windSpeed: 12,
-  condition: "Sunny",
-});
+/** Mirrors WeatherService.GetWeatherAsync. */
+export const getWeather = async (
+  location = "Consolacion, Cebu"
+): Promise<WeatherInfo> => {
+  await new Promise((r) => setTimeout(r, 400));
+  return {
+    location,
+    temperature: 32,
+    feelsLike: 37,
+    humidity: 85,
+    windSpeed: 12,
+    condition: "Sunny",
+  };
+};
 
 export const humidityLabel = (h: number) =>
   h >= 80 ? "High Humidity" : h >= 60 ? "Moderate Humidity" : "Low Humidity";
