@@ -1,19 +1,34 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { buildFabricResult } from "@/lib/habi";
+import { buildFabricResult, getRecentScans, getScanImageUrl } from "@/lib/habi";
 
 const Result = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  // ResultViewModel treats anything other than "success" as a warning/fail.
+  // ResultViewModel.OnResultTypeChanged: IsSuccess = value == "success".
   const raw = params.get("type") ?? "success";
   const isSuccess = raw === "success";
-  const resultType = isSuccess ? "success" : "fail";
+  const fabric = useMemo(
+    () => buildFabricResult(isSuccess ? "success" : "fail"),
+    [isSuccess]
+  );
 
-  const fabric = useMemo(() => buildFabricResult(resultType), [resultType]);
+  // Look up the saved scan to render the captured photo (matches ImagePath in repo).
+  const scanId = params.get("id");
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!scanId) return;
+    (async () => {
+      const scans = await getRecentScans(10);
+      const match = scans.find((s) => s.id === scanId);
+      setImageUrl(getScanImageUrl(match?.imagePath));
+    })();
+  }, [scanId]);
+
+  // Gradient + grade colors come straight from ResultViewModel.
   const gradient = isSuccess ? "var(--gradient-success)" : "var(--gradient-fail)";
-  const gradeColor = isSuccess ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
+  const gradeColor = isSuccess ? "#7BA05B" : "#D84545";
 
   return (
     <div className="min-h-screen text-white" style={{ background: gradient }}>
@@ -34,6 +49,12 @@ const Result = () => {
             ⟳
           </button>
         </div>
+
+        {imageUrl && (
+          <div className="mx-auto mt-4 h-40 w-40 overflow-hidden rounded-3xl border-2 border-white/30">
+            <img src={imageUrl} alt={fabric.name} className="h-full w-full object-cover" />
+          </div>
+        )}
 
         <div
           className="mx-auto mt-5 flex h-32 w-32 flex-col items-center justify-center rounded-full bg-white"
