@@ -109,7 +109,7 @@ const Scanner = () => {
           <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-sm">
             {/* Animated scanline overlay */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute inset-x-0 h-[2px] animate-[scanline_1.6s_ease-in-out_infinite] bg-sage-green/80 shadow-[0_0_12px_hsl(var(--sage-green))]" />
+              <div className="absolute inset-x-0 h-[2px] animate-scanline bg-sage-green/80 shadow-[0_0_12px_hsl(var(--sage-green))]" />
             </div>
             <div className="relative text-center">
               <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-sage-green border-t-transparent" />
