@@ -59,8 +59,7 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
     .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
     .order("scanned_at", { ascending: false });
   const { data, error } = limit ? await query.limit(limit) : await query;
-  if (error || !data) return [];
-  return data.map((r) => ({
+  const remote: ScanRecord[] = error || !data ? [] : data.map((r) => ({
     id: r.id as string,
     fabricName: r.fabric_name as string,
     grade: r.grade as string,
@@ -68,6 +67,11 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
     scannedAt: r.scanned_at as string,
     imagePath: (r.image_path as string | null) ?? undefined,
   }));
+  // Merge any offline drafts so the user sees pending scans immediately.
+  const merged = [...getOfflineScans(), ...remote].sort(
+    (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
+  );
+  return limit ? merged.slice(0, limit) : merged;
 };
 
 export interface NewScan {
@@ -77,10 +81,127 @@ export interface NewScan {
   imageFile?: File | Blob | null;
 }
 
+/** Local offline queue for scans saved while backend is unreachable. */
+const OFFLINE_KEY = "habi_offline_scans";
+
+interface OfflineScan {
+  localId: string;
+  fabricName: string;
+  grade: string;
+  fiberType: string;
+  scannedAt: string;
+  imageDataUrl?: string | null;
+  imageMime?: string | null;
+}
+
+const readOfflineQueue = (): OfflineScan[] => {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+};
+
+const writeOfflineQueue = (q: OfflineScan[]) =>
+  localStorage.setItem(OFFLINE_KEY, JSON.stringify(q));
+
+const fileToDataUrl = (file: File | Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+
+const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
+  const res = await fetch(dataUrl);
+  return res.blob();
+};
+
+export const getOfflineScans = (): ScanRecord[] =>
+  readOfflineQueue().map((o) => ({
+    id: `offline:${o.localId}`,
+    fabricName: o.fabricName,
+    grade: o.grade,
+    fiberType: o.fiberType,
+    scannedAt: o.scannedAt,
+    imagePath: null,
+  }));
+
+const queueOffline = async (record: NewScan): Promise<ScanRecord> => {
+  const localId = crypto.randomUUID();
+  const scannedAt = new Date().toISOString();
+  const entry: OfflineScan = {
+    localId,
+    fabricName: record.fabricName,
+    grade: record.grade,
+    fiberType: record.fiberType,
+    scannedAt,
+    imageDataUrl: record.imageFile ? await fileToDataUrl(record.imageFile) : null,
+    imageMime: record.imageFile ? (record.imageFile as File).type || "image/jpeg" : null,
+  };
+  const q = readOfflineQueue();
+  q.unshift(entry);
+  writeOfflineQueue(q);
+  return {
+    id: `offline:${localId}`,
+    fabricName: entry.fabricName,
+    grade: entry.grade,
+    fiberType: entry.fiberType,
+    scannedAt,
+    imagePath: null,
+  };
+};
+
+/** Replays queued offline scans to Supabase. Returns count synced. */
+export const syncOfflineScans = async (): Promise<number> => {
+  if (!navigator.onLine) return 0;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+  const queue = readOfflineQueue();
+  if (queue.length === 0) return 0;
+  const remaining: OfflineScan[] = [];
+  let synced = 0;
+  for (const item of queue) {
+    let imagePath: string | null = null;
+    try {
+      if (item.imageDataUrl) {
+        const blob = await dataUrlToBlob(item.imageDataUrl);
+        const ext = (item.imageMime || "image/jpeg").split("/")[1] || "jpg";
+        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("scan-images")
+          .upload(path, blob, { upsert: false, contentType: item.imageMime || "image/jpeg" });
+        if (!upErr) imagePath = path;
+      }
+      const { error } = await supabase.from("scans").insert({
+        user_id: user.id,
+        fabric_name: item.fabricName,
+        grade: item.grade,
+        fiber_type: item.fiberType,
+        image_path: imagePath,
+        scanned_at: item.scannedAt,
+      });
+      if (error) {
+        remaining.push(item);
+      } else {
+        synced++;
+      }
+    } catch {
+      remaining.push(item);
+    }
+  }
+  writeOfflineQueue(remaining);
+  return synced;
+};
+
 /** Mirrors ScannerViewModel.ProcessPhotoAsync save step. */
 export const saveScan = async (record: NewScan): Promise<ScanRecord | null> => {
+  if (!navigator.onLine) {
+    return queueOffline(record);
+  }
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return queueOffline(record);
 
   let imagePath: string | null = null;
   if (record.imageFile) {
@@ -106,6 +227,44 @@ export const saveScan = async (record: NewScan): Promise<ScanRecord | null> => {
     })
     .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
     .single();
+  if (error || !data) {
+    // Backend reachable but insert failed — queue locally so we don't lose it.
+    return queueOffline(record);
+  }
+  return {
+    id: data.id as string,
+    fabricName: data.fabric_name as string,
+    grade: data.grade as string,
+    fiberType: data.fiber_type as string,
+    scannedAt: data.scanned_at as string,
+    imagePath: (data.image_path as string | null) ?? undefined,
+  };
+};
+
+/** Mirrors DatabaseService.DeleteScanAsync — also removes the uploaded image. */
+export const deleteScan = async (scan: ScanRecord): Promise<boolean> => {
+  if (scan.id.startsWith("offline:")) {
+    const localId = scan.id.slice("offline:".length);
+    writeOfflineQueue(readOfflineQueue().filter((o) => o.localId !== localId));
+    return true;
+  }
+  if (scan.imagePath) {
+    await supabase.storage.from("scan-images").remove([scan.imagePath]);
+  }
+  const { error } = await supabase.from("scans").delete().eq("id", scan.id);
+  return !error;
+};
+
+/** Look up a single scan by id (supports offline drafts). */
+export const getScanById = async (id: string): Promise<ScanRecord | null> => {
+  if (id.startsWith("offline:")) {
+    return getOfflineScans().find((s) => s.id === id) ?? null;
+  }
+  const { data, error } = await supabase
+    .from("scans")
+    .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
+    .eq("id", id)
+    .maybeSingle();
   if (error || !data) return null;
   return {
     id: data.id as string,

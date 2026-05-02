@@ -2,23 +2,28 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   fabricAdvice,
+  deleteScan,
   getHulasPersona,
   getRecentScans,
   getScanImageUrl,
   getWeather,
   humidityLabel,
   loadHulasFromProfile,
+  syncOfflineScans,
   type HulasLevel,
   type ScanRecord,
   type WeatherInfo,
 } from "@/lib/habi";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [hulas, setHulasState] = useState<HulasLevel>("pawisin");
+
+  const refreshScans = async () => setScans(await getRecentScans(5));
 
   // Mirrors DashboardViewModel.LoadAsync — gate on auth, then load weather, profile, top-5 scans.
   useEffect(() => {
@@ -30,9 +35,34 @@ const Dashboard = () => {
       }
       setWeather(await getWeather("Consolacion, Cebu"));
       setHulasState(await loadHulasFromProfile());
-      setScans(await getRecentScans(5));
+      // Drain any offline drafts collected while disconnected.
+      const synced = await syncOfflineScans();
+      if (synced > 0) toast.success(`Synced ${synced} offline scan${synced > 1 ? "s" : ""}`);
+      await refreshScans();
     })();
+
+    const onOnline = async () => {
+      const synced = await syncOfflineScans();
+      if (synced > 0) {
+        toast.success(`Back online — synced ${synced} scan${synced > 1 ? "s" : ""}`);
+        await refreshScans();
+      }
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
   }, [navigate]);
+
+  const handleDelete = async (e: React.MouseEvent, s: ScanRecord) => {
+    e.stopPropagation();
+    if (!confirm(`Delete scan of ${s.fabricName}?`)) return;
+    const ok = await deleteScan(s);
+    if (ok) {
+      toast.success("Scan deleted");
+      await refreshScans();
+    } else {
+      toast.error("Could not delete scan");
+    }
+  };
 
   const { label: hulasLabel, advice: hulasAdvice } = getHulasPersona(hulas);
 
@@ -134,8 +164,13 @@ const Dashboard = () => {
             <div className="mt-2 divide-y divide-border">
               {scans.map((s) => {
                 const img = getScanImageUrl(s.imagePath);
+                const isOffline = s.id.startsWith("offline:");
                 return (
-                  <div key={s.id} className="flex items-center gap-3 py-2.5">
+                  <div
+                    key={s.id}
+                    onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
+                    className="flex cursor-pointer items-center gap-3 py-2.5"
+                  >
                     {img ? (
                       <img
                         src={img}
@@ -148,12 +183,25 @@ const Dashboard = () => {
                       </div>
                     )}
                     <div className="flex-1">
-                      <div className="text-sm font-semibold text-foreground">{s.fabricName}</div>
+                      <div className="text-sm font-semibold text-foreground">
+                        {s.fabricName}
+                        {isOffline && (
+                          <span className="ml-2 rounded-full bg-terracotta/20 px-2 py-0.5 text-[10px] font-semibold text-terracotta">
+                            Offline
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-muted-foreground">
                         {s.fiberType} · {formatDate(s.scannedAt)}
                       </div>
                     </div>
-                    <span className="text-lg text-muted-foreground">›</span>
+                    <button
+                      onClick={(e) => handleDelete(e, s)}
+                      aria-label={`Delete scan of ${s.fabricName}`}
+                      className="rounded-full px-2 py-1 text-lg text-muted-foreground hover:text-terracotta"
+                    >
+                      🗑️
+                    </button>
                   </div>
                 );
               })}
