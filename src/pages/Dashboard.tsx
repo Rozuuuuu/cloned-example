@@ -16,6 +16,7 @@ import {
 } from "@/lib/habi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import BottomNav from "@/components/BottomNav";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -154,7 +155,12 @@ const Dashboard = () => {
         <div className="habi-card">
           <div className="flex items-center justify-between">
             <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
-            <span className="text-sm font-semibold text-sage-green">See all</span>
+            <button
+              onClick={() => navigate("/history")}
+              className="text-sm font-semibold text-sage-green"
+            >
+              See all
+            </button>
           </div>
           {scans.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
@@ -222,16 +228,17 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* FAB only — repo Shell has a single Scanner entry, no Closet/Eco-Map. */}
-      <div className="fixed inset-x-0 bottom-0 z-20 px-5 pb-6 pt-2">
+      {/* Floating scan CTA + persistent bottom navigation */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-16 z-20 px-5">
         <button
           onClick={() => navigate("/scanner")}
-          className="mx-auto block w-full max-w-md rounded-full border-[3px] border-cream bg-deep-sage px-7 py-4 text-[15px] font-bold text-cream"
+          className="pointer-events-auto mx-auto block w-full max-w-md rounded-full border-[3px] border-cream bg-deep-sage px-7 py-4 text-[15px] font-bold text-cream"
           style={{ boxShadow: "var(--shadow-fab)" }}
         >
           📷 &nbsp;Start Fabric Scan
         </button>
       </div>
+      <BottomNav />
     </div>
   );
 };
