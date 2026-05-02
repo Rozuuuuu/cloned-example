@@ -59,8 +59,7 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
     .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
     .order("scanned_at", { ascending: false });
   const { data, error } = limit ? await query.limit(limit) : await query;
-  if (error || !data) return [];
-  return data.map((r) => ({
+  const remote: ScanRecord[] = error || !data ? [] : data.map((r) => ({
     id: r.id as string,
     fabricName: r.fabric_name as string,
     grade: r.grade as string,
@@ -68,6 +67,11 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
     scannedAt: r.scanned_at as string,
     imagePath: (r.image_path as string | null) ?? undefined,
   }));
+  // Merge any offline drafts so the user sees pending scans immediately.
+  const merged = [...getOfflineScans(), ...remote].sort(
+    (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
+  );
+  return limit ? merged.slice(0, limit) : merged;
 };
 
 export interface NewScan {
