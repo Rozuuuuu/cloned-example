@@ -134,7 +134,7 @@ const Dashboard = () => {
       </div>
 
       {/* Content */}
-      <div className="space-y-4 px-5 pb-40 pt-5">
+      <div className="space-y-4 px-5 pb-56 pt-5">
         <div className="rounded-3xl bg-deep-sage p-5 text-cream">
           <div className="flex items-center gap-2">
             <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
