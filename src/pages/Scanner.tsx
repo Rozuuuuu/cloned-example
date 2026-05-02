@@ -1,6 +1,20 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveScan } from "@/lib/habi";
+import { toast } from "sonner";
+
+const MAX_BYTES = 10 * 1024 * 1024; // 10 MB cap protects the analyze pipeline.
+const ACCEPTED = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+
+const validateImage = (file: File): string | null => {
+  if (!file.type.startsWith("image/")) return "Please pick an image file (JPG, PNG, or WebP).";
+  if (ACCEPTED.length && file.type && !ACCEPTED.includes(file.type)) {
+    return "Unsupported image type. Use JPG, PNG, or WebP.";
+  }
+  if (file.size > MAX_BYTES) return "Image is too large. Max size is 10 MB.";
+  if (file.size === 0) return "That file looks empty. Try another photo.";
+  return null;
+};
 
 type ScanState = "idle" | "analyzing";
 
@@ -39,6 +53,11 @@ const Scanner = () => {
     const file = e.target.files?.[0] ?? null;
     e.target.value = "";
     if (!file) return;
+    const err = validateImage(file);
+    if (err) {
+      toast.error(err);
+      return;
+    }
     void processPhoto(file);
   };
 
