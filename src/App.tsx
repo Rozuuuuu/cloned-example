@@ -10,6 +10,8 @@ import Onboarding from "./pages/Onboarding.tsx";
 import Dashboard from "./pages/Dashboard.tsx";
 import Scanner from "./pages/Scanner.tsx";
 import Result from "./pages/Result.tsx";
+import ScanDetail from "./pages/ScanDetail.tsx";
+import History from "./pages/History.tsx";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/scanner" element={<Scanner />} />
           <Route path="/result" element={<Result />} />
+          <Route path="/scan/:id" element={<ScanDetail />} />
+          <Route path="/history" element={<History />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
