@@ -1,20 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
   deleteScan,
   getRecentScans,
-  getScanImageUrl,
+  resolveScanImage,
   syncOfflineScans,
   type ScanRecord,
 } from "@/lib/habi";
 import BottomNav from "@/components/BottomNav";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const History = () => {
   const navigate = useNavigate();
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [gradeFilter, setGradeFilter] = useState<string>("all");
+  const [pendingDelete, setPendingDelete] = useState<ScanRecord | null>(null);
 
   const refresh = async () => {
     setScans(await getRecentScans());
@@ -35,8 +41,14 @@ const History = () => {
 
   const handleDelete = async (e: React.MouseEvent, s: ScanRecord) => {
     e.stopPropagation();
-    if (!confirm(`Delete scan of ${s.fabricName}?`)) return;
-    if (await deleteScan(s)) {
+    setPendingDelete(s);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setPendingDelete(null);
+    if (await deleteScan(target)) {
       toast.success("Scan deleted");
       await refresh();
     } else {
@@ -53,6 +65,27 @@ const History = () => {
       minute: "2-digit",
     });
 
+  const grades = useMemo(() => {
+    const set = new Set<string>();
+    scans.forEach((s) => s.grade && set.add(s.grade.charAt(0).toUpperCase()));
+    return Array.from(set).sort();
+  }, [scans]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return scans.filter((s) => {
+      if (gradeFilter !== "all" && !s.grade?.toUpperCase().startsWith(gradeFilter)) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        s.fabricName.toLowerCase().includes(q) ||
+        s.fiberType.toLowerCase().includes(q) ||
+        s.grade.toLowerCase().includes(q)
+      );
+    });
+  }, [scans, query, gradeFilter]);
+
   return (
     <div className="min-h-screen bg-cream pb-28">
       <header className="rounded-b-[28px] bg-deep-sage px-5 pb-6 pt-12 text-cream">
@@ -61,18 +94,60 @@ const History = () => {
       </header>
 
       <div className="px-5 pt-5">
+        {!loading && scans.length > 0 && (
+          <div className="mb-4 space-y-3">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, fiber, or grade…"
+              className="rounded-full border-deep-sage/20 bg-white"
+            />
+            <div className="flex flex-wrap gap-2">
+              {["all", ...grades].map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setGradeFilter(g)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    gradeFilter === g
+                      ? "bg-deep-sage text-cream"
+                      : "bg-white text-deep-sage border border-deep-sage/20"
+                  }`}
+                >
+                  {g === "all" ? "All grades" : `Grade ${g}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading...</p>
         ) : scans.length === 0 ? (
+          <div className="habi-card flex flex-col items-center gap-4 py-10 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sage-green/15 text-4xl">
+              📷
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-deep-sage">No scans yet</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Scan a fabric to see your history here.
+              </p>
+            </div>
+            <Button
+              onClick={() => navigate("/scanner")}
+              className="rounded-full bg-deep-sage px-6 text-cream hover:bg-deep-sage/90"
+            >
+              Start scanning
+            </Button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="habi-card text-center">
-            <p className="text-sm text-muted-foreground">
-              No scans yet. Tap the Scan tab to add your first item.
-            </p>
+            <p className="text-sm text-muted-foreground">No scans match your search.</p>
           </div>
         ) : (
           <div className="habi-card divide-y divide-border">
-            {scans.map((s) => {
-              const img = getScanImageUrl(s.imagePath);
+            {filtered.map((s) => {
+              const img = resolveScanImage(s);
               const isOffline = s.id.startsWith("offline:");
               return (
                 <div
@@ -84,6 +159,7 @@ const History = () => {
                     <img
                       src={img}
                       alt={s.fabricName}
+                      loading="lazy"
                       className="h-12 w-12 rounded-xl object-cover"
                     />
                   ) : (
@@ -120,6 +196,18 @@ const History = () => {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete this scan?"
+        description={
+          pendingDelete
+            ? `“${pendingDelete.fabricName}” will be permanently removed.`
+            : undefined
+        }
+        onConfirm={confirmDelete}
+        onOpenChange={(o) => !o && setPendingDelete(null)}
+      />
 
       <BottomNav />
     </div>

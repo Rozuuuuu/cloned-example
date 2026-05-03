@@ -9,6 +9,7 @@ export interface ScanRecord {
   fiberType: string;
   scannedAt: string;
   imagePath?: string | null;
+  imageDataUrl?: string | null;
 }
 
 export interface FabricData {
@@ -69,7 +70,14 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
   }));
   // Merge any offline drafts so the user sees pending scans immediately.
   const merged = [...getOfflineScans(), ...remote].sort(
-    (a, b) => new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime()
+    (a, b) => {
+      const diff = new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime();
+      if (diff !== 0) return diff;
+      const aOff = a.id.startsWith("offline:");
+      const bOff = b.id.startsWith("offline:");
+      if (aOff !== bOff) return aOff ? -1 : 1;
+      return b.id.localeCompare(a.id);
+    }
   );
   return limit ? merged.slice(0, limit) : merged;
 };
@@ -126,6 +134,7 @@ export const getOfflineScans = (): ScanRecord[] =>
     fiberType: o.fiberType,
     scannedAt: o.scannedAt,
     imagePath: null,
+    imageDataUrl: o.imageDataUrl ?? null,
   }));
 
 const queueOffline = async (record: NewScan): Promise<ScanRecord> => {
@@ -281,6 +290,13 @@ export const getScanImageUrl = (path?: string | null): string | undefined => {
   if (!path) return undefined;
   const { data } = supabase.storage.from("scan-images").getPublicUrl(path);
   return data.publicUrl;
+};
+
+/** Offline-friendly resolver: prefers inline data URL, falls back to storage URL. */
+export const resolveScanImage = (scan?: ScanRecord | null): string | undefined => {
+  if (!scan) return undefined;
+  if (scan.imageDataUrl) return scan.imageDataUrl;
+  return getScanImageUrl(scan.imagePath);
 };
 
 /**

@@ -5,10 +5,11 @@ import {
   buildFabricResult,
   deleteScan,
   getScanById,
-  getScanImageUrl,
+  resolveScanImage,
   type ScanRecord,
 } from "@/lib/habi";
 import { toast } from "sonner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 /** Scan result detail — mirrors ResultPage but loads a saved record by id. */
 const ScanDetail = () => {
@@ -17,6 +18,7 @@ const ScanDetail = () => {
   const scanId = decodeURIComponent(id);
   const [scan, setScan] = useState<ScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,7 +35,7 @@ const ScanDetail = () => {
     [isSuccess]
   );
 
-  const imageUrl = getScanImageUrl(scan?.imagePath);
+  const imageUrl = resolveScanImage(scan);
   const gradient = isSuccess ? "var(--gradient-success)" : "var(--gradient-fail)";
   const gradeColor = isSuccess ? "#7BA05B" : "#D84545";
 
@@ -54,7 +56,6 @@ const ScanDetail = () => {
   }
 
   const onDelete = async () => {
-    if (!confirm(`Delete scan of ${scan.fabricName}?`)) return;
     const ok = await deleteScan(scan);
     if (ok) {
       toast.success("Scan deleted");
@@ -76,7 +77,7 @@ const ScanDetail = () => {
             ←
           </button>
           <button
-            onClick={onDelete}
+            onClick={() => setConfirmOpen(true)}
             className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl"
             aria-label="Delete scan"
           >
@@ -86,7 +87,12 @@ const ScanDetail = () => {
 
         {imageUrl && (
           <div className="mx-auto mt-4 h-40 w-40 overflow-hidden rounded-3xl border-2 border-white/30">
-            <img src={imageUrl} alt={scan.fabricName} className="h-full w-full object-cover" />
+            <img
+              src={imageUrl}
+              alt={scan.fabricName}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
           </div>
         )}
 
@@ -165,6 +171,14 @@ const ScanDetail = () => {
           Scan Another Item
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete this scan?"
+        description={`“${scan.fabricName}” will be permanently removed.`}
+        onConfirm={onDelete}
+        onOpenChange={setConfirmOpen}
+      />
     </div>
   );
 };
