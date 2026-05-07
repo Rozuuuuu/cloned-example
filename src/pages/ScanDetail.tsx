@@ -19,6 +19,7 @@ const ScanDetail = () => {
   const [scan, setScan] = useState<ScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -56,12 +57,21 @@ const ScanDetail = () => {
   }
 
   const onDelete = async () => {
-    const ok = await deleteScan(scan);
-    if (ok) {
-      toast.success("Scan deleted");
-      navigate("/dashboard");
-    } else {
+    if (!scan || deleting) return;
+    setDeleting(true);
+    try {
+      const ok = await deleteScan(scan);
+      if (ok) {
+        toast.success("Scan deleted");
+        setConfirmOpen(false);
+        navigate("/history");
+      } else {
+        toast.error("Could not delete scan");
+      }
+    } catch {
       toast.error("Could not delete scan");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -176,8 +186,13 @@ const ScanDetail = () => {
         open={confirmOpen}
         title="Delete this scan?"
         description={`“${scan.fabricName}” will be permanently removed.`}
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        disabled={deleting}
         onConfirm={onDelete}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(o) => {
+          if (deleting) return;
+          setConfirmOpen(o);
+        }}
       />
     </div>
   );
