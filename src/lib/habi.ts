@@ -28,6 +28,50 @@ export interface FabricData {
 }
 
 const HULAS_KEY = "hulas_level";
+const IMAGE_CACHE_KEY = "habi_image_cache";
+
+/** Lightweight cache mapping scan id → resolved image (data URL or storage URL).
+ *  Lets History and ScanDetail render images instantly, even offline. */
+const readImageCache = (): Record<string, string> => {
+  try {
+    return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+};
+const writeImageCache = (c: Record<string, string>) => {
+  try {
+    localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(c));
+  } catch {
+    /* quota — ignore */
+  }
+};
+
+export const getCachedScanImage = (id?: string | null): string | undefined => {
+  if (!id) return undefined;
+  return readImageCache()[id];
+};
+
+export const cacheScanImage = (id: string, url?: string | null) => {
+  if (!url) return;
+  const c = readImageCache();
+  if (c[id] === url) return;
+  c[id] = url;
+  writeImageCache(c);
+};
+
+export const pruneImageCache = (validIds: string[]) => {
+  const set = new Set(validIds);
+  const c = readImageCache();
+  let changed = false;
+  for (const k of Object.keys(c)) {
+    if (!set.has(k)) {
+      delete c[k];
+      changed = true;
+    }
+  }
+  if (changed) writeImageCache(c);
+};
 
 export const getHulas = (): HulasLevel =>
   (localStorage.getItem(HULAS_KEY) as HulasLevel) || "pawisin";
@@ -53,6 +97,22 @@ export const loadHulasFromProfile = async (): Promise<HulasLevel> => {
   return level;
 };
 
+/**
+ * Stable sort: newest scannedAt first; ties → offline drafts first, then id desc.
+ * Mirrors the repository's DatabaseService ordering and exposed for tests.
+ */
+export const compareScans = (a: ScanRecord, b: ScanRecord): number => {
+  const diff = new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime();
+  if (diff !== 0) return diff;
+  const aOff = a.id.startsWith("offline:");
+  const bOff = b.id.startsWith("offline:");
+  if (aOff !== bOff) return aOff ? -1 : 1;
+  return b.id.localeCompare(a.id);
+};
+
+export const sortScans = (records: ScanRecord[]): ScanRecord[] =>
+  [...records].sort(compareScans);
+
 /** Mirrors DatabaseService.GetScansAsync — newest first, optionally limited. */
 export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
   const query = supabase
@@ -69,16 +129,7 @@ export const getRecentScans = async (limit?: number): Promise<ScanRecord[]> => {
     imagePath: (r.image_path as string | null) ?? undefined,
   }));
   // Merge any offline drafts so the user sees pending scans immediately.
-  const merged = [...getOfflineScans(), ...remote].sort(
-    (a, b) => {
-      const diff = new Date(b.scannedAt).getTime() - new Date(a.scannedAt).getTime();
-      if (diff !== 0) return diff;
-      const aOff = a.id.startsWith("offline:");
-      const bOff = b.id.startsWith("offline:");
-      if (aOff !== bOff) return aOff ? -1 : 1;
-      return b.id.localeCompare(a.id);
-    }
-  );
+  const merged = sortScans([...getOfflineScans(), ...remote]);
   return limit ? merged.slice(0, limit) : merged;
 };
 
@@ -295,8 +346,13 @@ export const getScanImageUrl = (path?: string | null): string | undefined => {
 /** Offline-friendly resolver: prefers inline data URL, falls back to storage URL. */
 export const resolveScanImage = (scan?: ScanRecord | null): string | undefined => {
   if (!scan) return undefined;
-  if (scan.imageDataUrl) return scan.imageDataUrl;
-  return getScanImageUrl(scan.imagePath);
+  const url = scan.imageDataUrl || getScanImageUrl(scan.imagePath);
+  if (url) cacheScanImage(scan.id, url);
+  else {
+    const cached = getCachedScanImage(scan.id);
+    if (cached) return cached;
+  }
+  return url;
 };
 
 /**

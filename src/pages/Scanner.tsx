@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { saveScan } from "@/lib/habi";
 import { toast } from "sonner";
 
@@ -20,10 +20,22 @@ type ScanState = "idle" | "analyzing";
 
 const Scanner = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const captureBtnRef = useRef<HTMLButtonElement>(null);
   const [state, setState] = useState<ScanState>("idle");
   const [flashOn, setFlashOn] = useState(false);
   const [statusText, setStatusText] = useState("Point camera at fabric weave");
+
+  useEffect(() => {
+    // When History's empty state routes us here, focus the capture CTA so the
+    // user can press Enter / Space to start their first scan immediately.
+    const focus = (location.state as { focusCapture?: boolean } | null)?.focusCapture;
+    if (focus) {
+      const t = window.setTimeout(() => captureBtnRef.current?.focus(), 60);
+      return () => window.clearTimeout(t);
+    }
+  }, [location.state]);
 
   // Mirrors ScannerViewModel.ProcessPhotoAsync — analyze, save, then navigate.
   const processPhoto = async (file?: File | null) => {
@@ -161,6 +173,7 @@ const Scanner = () => {
 
           {/* CaptureAndScanAsync */}
           <button
+            ref={captureBtnRef}
             disabled={isAnalyzing}
             onClick={openCamera}
             className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border-4 border-cream bg-sage-green text-3xl text-white disabled:opacity-50"

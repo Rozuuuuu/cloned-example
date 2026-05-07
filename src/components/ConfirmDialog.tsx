@@ -15,6 +15,7 @@ interface Props {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  disabled?: boolean;
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
 }
@@ -26,6 +27,7 @@ const ConfirmDialog = ({
   description,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
+  disabled = false,
   onConfirm,
   onOpenChange,
 }: Props) => (
@@ -40,10 +42,19 @@ const ConfirmDialog = ({
         )}
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel className="rounded-full">{cancelLabel}</AlertDialogCancel>
+        <AlertDialogCancel className="rounded-full" disabled={disabled}>
+          {cancelLabel}
+        </AlertDialogCancel>
         <AlertDialogAction
-          onClick={onConfirm}
-          className="rounded-full bg-terracotta text-white hover:bg-terracotta/90"
+          disabled={disabled}
+          onClick={(e) => {
+            // Prevent Radix from auto-closing so the parent controls modal state
+            // (keeps it open on failure, closes only on success).
+            e.preventDefault();
+            if (disabled) return;
+            onConfirm();
+          }}
+          className="rounded-full bg-terracotta text-white hover:bg-terracotta/90 disabled:opacity-60"
         >
           {confirmLabel}
         </AlertDialogAction>
