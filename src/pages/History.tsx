@@ -223,6 +223,7 @@ const History = () => {
             : undefined
         }
         confirmLabel={deleting ? "Deleting…" : "Delete"}
+        disabled={deleting}
         onConfirm={confirmDelete}
         onOpenChange={(o) => {
           if (deleting) return; // lock modal during delete
