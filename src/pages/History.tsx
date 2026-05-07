@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   deleteScan,
   getRecentScans,
+  pruneImageCache,
   resolveScanImage,
   syncOfflineScans,
   type ScanRecord,
@@ -21,9 +22,12 @@ const History = () => {
   const [query, setQuery] = useState("");
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [pendingDelete, setPendingDelete] = useState<ScanRecord | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = async () => {
-    setScans(await getRecentScans());
+    const next = await getRecentScans();
+    setScans(next);
+    pruneImageCache(next.map((s) => s.id));
     setLoading(false);
   };
 
@@ -39,20 +43,30 @@ const History = () => {
     })();
   }, [navigate]);
 
-  const handleDelete = async (e: React.MouseEvent, s: ScanRecord) => {
+  const handleDelete = (e: React.MouseEvent, s: ScanRecord) => {
     e.stopPropagation();
+    if (deleting) return;
     setPendingDelete(s);
   };
 
   const confirmDelete = async () => {
-    if (!pendingDelete) return;
+    if (!pendingDelete || deleting) return;
     const target = pendingDelete;
-    setPendingDelete(null);
-    if (await deleteScan(target)) {
-      toast.success("Scan deleted");
-      await refresh();
-    } else {
+    setDeleting(true);
+    try {
+      const ok = await deleteScan(target);
+      if (ok) {
+        toast.success("Scan deleted");
+        setPendingDelete(null);
+        await refresh();
+      } else {
+        toast.error("Could not delete scan");
+        // keep modal open so the user can retry — but don't double-fire
+      }
+    } catch {
       toast.error("Could not delete scan");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -134,7 +148,9 @@ const History = () => {
               </p>
             </div>
             <Button
-              onClick={() => navigate("/scanner")}
+              onClick={() =>
+                navigate("/scanner", { state: { focusCapture: true } })
+              }
               className="rounded-full bg-deep-sage px-6 text-cream hover:bg-deep-sage/90"
             >
               Start scanning
@@ -185,8 +201,9 @@ const History = () => {
                   </div>
                   <button
                     onClick={(e) => handleDelete(e, s)}
+                    disabled={deleting}
                     aria-label={`Delete scan of ${s.fabricName}`}
-                    className="rounded-full px-2 py-1 text-lg text-muted-foreground hover:text-terracotta"
+                    className="rounded-full px-2 py-1 text-lg text-muted-foreground hover:text-terracotta disabled:opacity-40"
                   >
                     🗑️
                   </button>
@@ -205,8 +222,12 @@ const History = () => {
             ? `“${pendingDelete.fabricName}” will be permanently removed.`
             : undefined
         }
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
         onConfirm={confirmDelete}
-        onOpenChange={(o) => !o && setPendingDelete(null)}
+        onOpenChange={(o) => {
+          if (deleting) return; // lock modal during delete
+          if (!o) setPendingDelete(null);
+        }}
       />
 
       <BottomNav />
