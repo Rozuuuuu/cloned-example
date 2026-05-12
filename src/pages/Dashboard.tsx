@@ -37,15 +37,30 @@ const Dashboard = () => {
       setWeather(await getWeather("Consolacion, Cebu"));
       setHulasState(await loadHulasFromProfile());
       // Drain any offline drafts collected while disconnected.
-      const synced = await syncOfflineScans();
-      if (synced > 0) toast.success(`Synced ${synced} offline scan${synced > 1 ? "s" : ""}`);
+      const r = await syncOfflineScans();
+      if (r.synced > 0) {
+        toast.success(`Synced ${r.synced} offline scan${r.synced > 1 ? "s" : ""}`);
+        if (r.imageFailures > 0) {
+          toast.warning(
+            `${r.imageFailures} image${r.imageFailures > 1 ? "s" : ""} couldn't upload — scan saved without photo.`
+          );
+        }
+      }
+      if (r.failed > 0) {
+        toast.error(`${r.failed} scan${r.failed > 1 ? "s" : ""} still pending — will retry.`);
+      }
       await refreshScans();
     })();
 
     const onOnline = async () => {
-      const synced = await syncOfflineScans();
-      if (synced > 0) {
-        toast.success(`Back online — synced ${synced} scan${synced > 1 ? "s" : ""}`);
+      const r = await syncOfflineScans();
+      if (r.synced > 0) {
+        toast.success(`Back online — synced ${r.synced} scan${r.synced > 1 ? "s" : ""}`);
+        if (r.imageFailures > 0) {
+          toast.warning(
+            `${r.imageFailures} image${r.imageFailures > 1 ? "s" : ""} couldn't upload.`
+          );
+        }
         await refreshScans();
       }
     };

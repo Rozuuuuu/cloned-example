@@ -29,49 +29,107 @@ export interface FabricData {
 
 const HULAS_KEY = "hulas_level";
 const IMAGE_CACHE_KEY = "habi_image_cache";
+/** Hard cap so the cache can't grow forever (and break offline loads). */
+const IMAGE_CACHE_MAX = 50;
 
-/** Lightweight cache mapping scan id → resolved image (data URL or storage URL).
- *  Lets History and ScanDetail render images instantly, even offline. */
-const readImageCache = (): Record<string, string> => {
+/**
+ * LRU image cache: scan id → resolved image (data URL or storage URL).
+ * Stored as { order: string[], items: { [id]: url } } where `order` is
+ * least-recent → most-recent. Lets History/ScanDetail render images instantly,
+ * even offline, while staying bounded so localStorage never blows past quota.
+ */
+interface ImageCacheShape {
+  order: string[];
+  items: Record<string, string>;
+}
+
+const emptyCache = (): ImageCacheShape => ({ order: [], items: {} });
+
+const readImageCache = (): ImageCacheShape => {
   try {
-    return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || "{}");
+    const raw = JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || "null");
+    if (raw && Array.isArray(raw.order) && raw.items && typeof raw.items === "object") {
+      return { order: raw.order, items: raw.items };
+    }
+    // Migrate legacy flat-object format → seed order from existing keys.
+    if (raw && typeof raw === "object") {
+      const items = raw as Record<string, string>;
+      return { order: Object.keys(items), items };
+    }
   } catch {
-    return {};
+    /* fall through */
   }
+  return emptyCache();
 };
-const writeImageCache = (c: Record<string, string>) => {
+
+const writeImageCache = (c: ImageCacheShape) => {
   try {
     localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(c));
   } catch {
-    /* quota — ignore */
+    /* quota — drop oldest half and retry once */
+    try {
+      const trimmed: ImageCacheShape = {
+        order: c.order.slice(-Math.ceil(IMAGE_CACHE_MAX / 2)),
+        items: {},
+      };
+      trimmed.order.forEach((id) => {
+        if (c.items[id]) trimmed.items[id] = c.items[id];
+      });
+      localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(trimmed));
+    } catch {
+      /* give up — cache is best-effort */
+    }
+  }
+};
+
+const touch = (c: ImageCacheShape, id: string) => {
+  const idx = c.order.indexOf(id);
+  if (idx !== -1) c.order.splice(idx, 1);
+  c.order.push(id);
+};
+
+const evictIfNeeded = (c: ImageCacheShape) => {
+  while (c.order.length > IMAGE_CACHE_MAX) {
+    const oldest = c.order.shift();
+    if (oldest) delete c.items[oldest];
   }
 };
 
 export const getCachedScanImage = (id?: string | null): string | undefined => {
   if (!id) return undefined;
-  return readImageCache()[id];
+  const c = readImageCache();
+  const url = c.items[id];
+  if (!url) return undefined;
+  // Mark as recently used so frequently-viewed scans survive eviction.
+  touch(c, id);
+  writeImageCache(c);
+  return url;
 };
 
 export const cacheScanImage = (id: string, url?: string | null) => {
   if (!url) return;
   const c = readImageCache();
-  if (c[id] === url) return;
-  c[id] = url;
+  if (c.items[id] === url && c.order[c.order.length - 1] === id) return;
+  c.items[id] = url;
+  touch(c, id);
+  evictIfNeeded(c);
   writeImageCache(c);
 };
 
 export const pruneImageCache = (validIds: string[]) => {
   const set = new Set(validIds);
   const c = readImageCache();
-  let changed = false;
-  for (const k of Object.keys(c)) {
-    if (!set.has(k)) {
-      delete c[k];
-      changed = true;
-    }
-  }
-  if (changed) writeImageCache(c);
+  const nextOrder = c.order.filter((id) => set.has(id));
+  if (nextOrder.length === c.order.length) return;
+  const items: Record<string, string> = {};
+  nextOrder.forEach((id) => {
+    if (c.items[id]) items[id] = c.items[id];
+  });
+  writeImageCache({ order: nextOrder, items });
 };
+
+/** Test/debug helper — returns current LRU cap. */
+export const getImageCacheLimit = () => IMAGE_CACHE_MAX;
 
 export const getHulas = (): HulasLevel =>
   (localStorage.getItem(HULAS_KEY) as HulasLevel) || "pawisin";
@@ -213,17 +271,28 @@ const queueOffline = async (record: NewScan): Promise<ScanRecord> => {
   };
 };
 
-/** Replays queued offline scans to Supabase. Returns count synced. */
-export const syncOfflineScans = async (): Promise<number> => {
-  if (!navigator.onLine) return 0;
+export interface SyncResult {
+  /** Scan rows successfully inserted on the backend. */
+  synced: number;
+  /** Scans that synced but whose image upload failed (row saved without image). */
+  imageFailures: number;
+  /** Scans that could not be synced at all and remain queued locally. */
+  failed: number;
+}
+
+/** Replays queued offline scans to Supabase. */
+export const syncOfflineScans = async (): Promise<SyncResult> => {
+  const empty: SyncResult = { synced: 0, imageFailures: 0, failed: 0 };
+  if (!navigator.onLine) return empty;
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return 0;
+  if (!user) return empty;
   const queue = readOfflineQueue();
-  if (queue.length === 0) return 0;
+  if (queue.length === 0) return empty;
   const remaining: OfflineScan[] = [];
-  let synced = 0;
+  const result: SyncResult = { synced: 0, imageFailures: 0, failed: 0 };
   for (const item of queue) {
     let imagePath: string | null = null;
+    let imageUploadFailed = false;
     try {
       if (item.imageDataUrl) {
         const blob = await dataUrlToBlob(item.imageDataUrl);
@@ -233,6 +302,7 @@ export const syncOfflineScans = async (): Promise<number> => {
           .from("scan-images")
           .upload(path, blob, { upsert: false, contentType: item.imageMime || "image/jpeg" });
         if (!upErr) imagePath = path;
+        else imageUploadFailed = true;
       }
       const { error } = await supabase.from("scans").insert({
         user_id: user.id,
@@ -244,15 +314,18 @@ export const syncOfflineScans = async (): Promise<number> => {
       });
       if (error) {
         remaining.push(item);
+        result.failed++;
       } else {
-        synced++;
+        result.synced++;
+        if (imageUploadFailed) result.imageFailures++;
       }
     } catch {
       remaining.push(item);
+      result.failed++;
     }
   }
   writeOfflineQueue(remaining);
-  return synced;
+  return result;
 };
 
 /** Mirrors ScannerViewModel.ProcessPhotoAsync save step. */

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -15,6 +15,21 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+const PAGE_SIZE = 20;
+
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+const csvCell = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
+
 const History = () => {
   const navigate = useNavigate();
   const [scans, setScans] = useState<ScanRecord[]>([]);
@@ -23,6 +38,8 @@ const History = () => {
   const [gradeFilter, setGradeFilter] = useState<string>("all");
   const [pendingDelete, setPendingDelete] = useState<ScanRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const refresh = async () => {
     const next = await getRecentScans();
@@ -100,11 +117,125 @@ const History = () => {
     });
   }, [scans, query, gradeFilter]);
 
+  // Reset paging whenever the visible filtered set changes.
+  useEffect(() => {
+    setVisible(PAGE_SIZE);
+  }, [query, gradeFilter, scans.length]);
+
+  const paged = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
+  const hasMore = paged.length < filtered.length;
+
+  // Infinite scroll: load more when the sentinel comes into view.
+  useEffect(() => {
+    if (!hasMore) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setVisible((v) => v + PAGE_SIZE);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasMore, paged.length]);
+
+  // Keyboard shortcuts:
+  //  • Modal open → Enter confirms, Esc cancels (Radix already handles Esc but
+  //    we lock both while a delete is in-flight to avoid double-fires).
+  //  • Otherwise → "n" / "s" jumps to the scanner with capture focused.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+      if (pendingDelete) {
+        if (deleting) {
+          if (e.key === "Enter" || e.key === "Escape") e.preventDefault();
+          return;
+        }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          void confirmDelete();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          setPendingDelete(null);
+        }
+        return;
+      }
+      if (typing) return;
+      if (e.key === "n" || e.key === "s" || e.key === "N" || e.key === "S") {
+        e.preventDefault();
+        navigate("/scanner", { state: { focusCapture: true } });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pendingDelete, deleting, navigate]);
+
+  const exportScans = (format: "csv" | "json") => {
+    if (filtered.length === 0) {
+      toast.error("Nothing to export.");
+      return;
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (format === "json") {
+      const blob = new Blob([JSON.stringify(filtered, null, 2)], {
+        type: "application/json",
+      });
+      downloadBlob(blob, `habi-scans-${stamp}.json`);
+    } else {
+      const header = ["id", "fabricName", "fiberType", "grade", "scannedAt", "imagePath"];
+      const rows = filtered.map((s) =>
+        [s.id, s.fabricName, s.fiberType, s.grade, s.scannedAt, s.imagePath ?? ""]
+          .map((v) => csvCell(String(v)))
+          .join(",")
+      );
+      const blob = new Blob([[header.join(","), ...rows].join("\n")], {
+        type: "text/csv;charset=utf-8",
+      });
+      downloadBlob(blob, `habi-scans-${stamp}.csv`);
+    }
+    toast.success(`Exported ${filtered.length} scan${filtered.length > 1 ? "s" : ""}`);
+  };
+
   return (
     <div className="min-h-screen bg-cream pb-28">
       <header className="rounded-b-[28px] bg-deep-sage px-5 pb-6 pt-12 text-cream">
-        <h1 className="text-2xl font-bold">Scan History</h1>
-        <p className="mt-1 text-sm text-[#CCDDCB]">All your fabric scans, newest first.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Scan History</h1>
+            <p className="mt-1 text-sm text-[#CCDDCB]">
+              All your fabric scans, newest first.
+            </p>
+          </div>
+          {scans.length > 0 && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => exportScans("csv")}
+                className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-cream hover:bg-white/25"
+                aria-label="Export scans as CSV"
+              >
+                ⬇ CSV
+              </button>
+              <button
+                onClick={() => exportScans("json")}
+                className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-cream hover:bg-white/25"
+                aria-label="Export scans as JSON"
+              >
+                ⬇ JSON
+              </button>
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-[10px] text-[#AACCAA]">
+          Shortcuts: N new scan · Enter confirm · Esc cancel
+        </p>
       </header>
 
       <div className="px-5 pt-5">
@@ -162,7 +293,7 @@ const History = () => {
           </div>
         ) : (
           <div className="habi-card divide-y divide-border">
-            {filtered.map((s) => {
+            {paged.map((s) => {
               const img = resolveScanImage(s);
               const isOffline = s.id.startsWith("offline:");
               return (
@@ -210,6 +341,19 @@ const History = () => {
                 </div>
               );
             })}
+            {hasMore && (
+              <div
+                ref={sentinelRef}
+                className="flex items-center justify-center py-4 text-xs text-muted-foreground"
+              >
+                Loading more…
+              </div>
+            )}
+            {!hasMore && filtered.length > PAGE_SIZE && (
+              <div className="py-3 text-center text-[11px] text-muted-foreground">
+                End of history · {filtered.length} scans
+              </div>
+            )}
           </div>
         )}
       </div>
