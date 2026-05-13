@@ -6,6 +6,7 @@ import {
   getRecentScans,
   pruneImageCache,
   resolveScanImage,
+  sortScans,
   syncOfflineScans,
   type ScanRecord,
 } from "@/lib/habi";
@@ -179,19 +180,22 @@ const History = () => {
   }, [pendingDelete, deleting, navigate]);
 
   const exportScans = (format: "csv" | "json") => {
-    if (filtered.length === 0) {
+    // Re-sort defensively so exports always match the on-screen tie-break order
+    // (newest scannedAt first; ties → offline drafts first, then id desc).
+    const ordered = sortScans(filtered);
+    if (ordered.length === 0) {
       toast.error("Nothing to export.");
       return;
     }
     const stamp = new Date().toISOString().slice(0, 10);
     if (format === "json") {
-      const blob = new Blob([JSON.stringify(filtered, null, 2)], {
+      const blob = new Blob([JSON.stringify(ordered, null, 2)], {
         type: "application/json",
       });
       downloadBlob(blob, `habi-scans-${stamp}.json`);
     } else {
       const header = ["id", "fabricName", "fiberType", "grade", "scannedAt", "imagePath"];
-      const rows = filtered.map((s) =>
+      const rows = ordered.map((s) =>
         [s.id, s.fabricName, s.fiberType, s.grade, s.scannedAt, s.imagePath ?? ""]
           .map((v) => csvCell(String(v)))
           .join(",")
@@ -201,7 +205,7 @@ const History = () => {
       });
       downloadBlob(blob, `habi-scans-${stamp}.csv`);
     }
-    toast.success(`Exported ${filtered.length} scan${filtered.length > 1 ? "s" : ""}`);
+    toast.success(`Exported ${ordered.length} scan${ordered.length > 1 ? "s" : ""}`);
   };
 
   return (
@@ -233,9 +237,22 @@ const History = () => {
             </div>
           )}
         </div>
-        <p className="mt-2 text-[10px] text-[#AACCAA]">
-          Shortcuts: N new scan · Enter confirm · Esc cancel
-        </p>
+        <div
+          aria-label="Keyboard shortcuts"
+          className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-[#AACCAA]"
+        >
+          <span className="opacity-80">Shortcuts:</span>
+          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">N</kbd>
+          <span>/</span>
+          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">S</kbd>
+          <span className="opacity-80">new scan</span>
+          <span className="opacity-50">·</span>
+          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">Enter</kbd>
+          <span className="opacity-80">confirm delete</span>
+          <span className="opacity-50">·</span>
+          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">Esc</kbd>
+          <span className="opacity-80">cancel</span>
+        </div>
       </header>
 
       <div className="px-5 pt-5">
