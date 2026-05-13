@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   fabricAdvice,
@@ -23,6 +23,45 @@ const Dashboard = () => {
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [hulas, setHulasState] = useState<HulasLevel>("pawisin");
+  // Guard so we surface at most one toast per reconnect cycle (or initial load).
+  // Reset to `false` on the `offline` event so the next reconnect can toast again.
+  const syncingRef = useRef(false);
+  const reportedRef = useRef(false);
+
+  const reportSync = (
+    r: { synced: number; imageFailures: number; failed: number; remaining: number },
+    prefix: string
+  ) => {
+    if (reportedRef.current) return;
+    if (r.synced === 0 && r.imageFailures === 0 && r.failed === 0) return;
+    reportedRef.current = true;
+    if (r.synced > 0) {
+      toast.success(
+        `${prefix}synced ${r.synced} scan${r.synced > 1 ? "s" : ""}` +
+          (r.remaining > 0 ? ` · ${r.remaining} still queued` : "")
+      );
+    }
+    if (r.imageFailures > 0) {
+      toast.warning(
+        `${r.imageFailures} image${r.imageFailures > 1 ? "s" : ""} couldn't upload — scan saved without photo.`
+      );
+    }
+    if (r.failed > 0 && r.synced === 0) {
+      toast.error(`${r.failed} scan${r.failed > 1 ? "s" : ""} still pending — will retry.`);
+    }
+  };
+
+  const runSync = async (prefix: string) => {
+    if (syncingRef.current) return null;
+    syncingRef.current = true;
+    try {
+      const r = await syncOfflineScans();
+      reportSync(r, prefix);
+      return r;
+    } finally {
+      syncingRef.current = false;
+    }
+  };
 
   const refreshScans = async () => setScans(await getRecentScans(5));
 
@@ -37,35 +76,26 @@ const Dashboard = () => {
       setWeather(await getWeather("Consolacion, Cebu"));
       setHulasState(await loadHulasFromProfile());
       // Drain any offline drafts collected while disconnected.
-      const r = await syncOfflineScans();
-      if (r.synced > 0) {
-        toast.success(`Synced ${r.synced} offline scan${r.synced > 1 ? "s" : ""}`);
-        if (r.imageFailures > 0) {
-          toast.warning(
-            `${r.imageFailures} image${r.imageFailures > 1 ? "s" : ""} couldn't upload — scan saved without photo.`
-          );
-        }
-      }
-      if (r.failed > 0) {
-        toast.error(`${r.failed} scan${r.failed > 1 ? "s" : ""} still pending — will retry.`);
-      }
+      await runSync("");
       await refreshScans();
     })();
 
     const onOnline = async () => {
-      const r = await syncOfflineScans();
-      if (r.synced > 0) {
-        toast.success(`Back online — synced ${r.synced} scan${r.synced > 1 ? "s" : ""}`);
-        if (r.imageFailures > 0) {
-          toast.warning(
-            `${r.imageFailures} image${r.imageFailures > 1 ? "s" : ""} couldn't upload.`
-          );
-        }
-        await refreshScans();
-      }
+      // Reset the per-reconnect guard so this event can produce one toast.
+      reportedRef.current = false;
+      const r = await runSync("Back online — ");
+      if (r && r.synced > 0) await refreshScans();
+    };
+    const onOffline = () => {
+      // Arm the guard for the next reconnect.
+      reportedRef.current = false;
     };
     window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
   }, [navigate]);
 
   const handleDelete = async (e: React.MouseEvent, s: ScanRecord) => {
