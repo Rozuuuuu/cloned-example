@@ -278,18 +278,20 @@ export interface SyncResult {
   imageFailures: number;
   /** Scans that could not be synced at all and remain queued locally. */
   failed: number;
+  /** Total scans still queued locally after this sync attempt. */
+  remaining: number;
 }
 
 /** Replays queued offline scans to Supabase. */
 export const syncOfflineScans = async (): Promise<SyncResult> => {
-  const empty: SyncResult = { synced: 0, imageFailures: 0, failed: 0 };
+  const empty: SyncResult = { synced: 0, imageFailures: 0, failed: 0, remaining: 0 };
   if (!navigator.onLine) return empty;
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return empty;
+  if (!user) return { ...empty, remaining: readOfflineQueue().length };
   const queue = readOfflineQueue();
   if (queue.length === 0) return empty;
   const remaining: OfflineScan[] = [];
-  const result: SyncResult = { synced: 0, imageFailures: 0, failed: 0 };
+  const result: SyncResult = { synced: 0, imageFailures: 0, failed: 0, remaining: 0 };
   for (const item of queue) {
     let imagePath: string | null = null;
     let imageUploadFailed = false;
@@ -325,6 +327,7 @@ export const syncOfflineScans = async (): Promise<SyncResult> => {
     }
   }
   writeOfflineQueue(remaining);
+  result.remaining = remaining.length;
   return result;
 };
 
