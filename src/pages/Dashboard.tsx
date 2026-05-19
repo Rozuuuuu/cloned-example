@@ -17,9 +17,11 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import BottomNav from "@/components/BottomNav";
+import { signOutEverywhere, useAuthGuard } from "@/hooks/use-auth-guard";
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { session, checked } = useAuthGuard();
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [hulas, setHulasState] = useState<HulasLevel>("pawisin");
@@ -67,12 +69,8 @@ const Dashboard = () => {
 
   // Mirrors DashboardViewModel.LoadAsync — gate on auth, then load weather, profile, top-5 scans.
   useEffect(() => {
+    if (!session) return;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/login", { replace: true });
-        return;
-      }
       setWeather(await getWeather("Consolacion, Cebu"));
       setHulasState(await loadHulasFromProfile());
       // Drain any offline drafts collected while disconnected.
@@ -96,7 +94,29 @@ const Dashboard = () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, [navigate]);
+  }, [navigate, session]);
+
+  const handleLogout = async () => {
+    await signOutEverywhere();
+    toast.success("Signed out");
+    navigate("/login", { replace: true });
+  };
+
+  const handleLinkGoogle = async () => {
+    try {
+      const { error } = await supabase.auth.linkIdentity({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/dashboard` },
+      });
+      if (error) throw error;
+    } catch (err) {
+      toast.error(`Couldn't link Google: ${(err as Error).message}`);
+    }
+  };
+
+  const identities = session?.user?.identities ?? [];
+  const hasGoogle = identities.some((i) => i.provider === "google");
+  const hasEmail = identities.some((i) => i.provider === "email");
 
   const handleDelete = async (e: React.MouseEvent, s: ScanRecord) => {
     e.stopPropagation();
@@ -119,7 +139,7 @@ const Dashboard = () => {
       year: "numeric",
     });
 
-  if (!weather) {
+  if (!checked || !weather) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-cream text-deep-sage">
         Loading...
@@ -138,7 +158,24 @@ const Dashboard = () => {
           </div>
           <div className="flex gap-2.5">
             <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg">🔔</div>
-            <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg">👤</div>
+            {hasEmail && !hasGoogle && (
+              <button
+                onClick={handleLinkGoogle}
+                aria-label="Link Google account"
+                title="Link Google account"
+                className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg hover:bg-white/30"
+              >
+                🔗
+              </button>
+            )}
+            <button
+              onClick={handleLogout}
+              aria-label="Sign out"
+              title="Sign out"
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg hover:bg-white/30"
+            >
+              🚪
+            </button>
           </div>
         </div>
 
