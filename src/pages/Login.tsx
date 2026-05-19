@@ -94,7 +94,7 @@ const Login = () => {
         <p className="text-sm text-muted-foreground">Eco-conscious fabric scanner</p>
       </div>
 
-      <form onSubmit={handleLogin} className="habi-card mx-5 mt-6 space-y-5">
+      <form onSubmit={handleLogin} className="habi-card mx-5 mt-6 space-y-5 sm:mx-auto sm:max-w-md md:max-w-lg">
         <div>
           <h2 className="text-[22px] font-semibold text-deep-sage">
             {mode === "login" ? "Welcome back" : "Create account"}
