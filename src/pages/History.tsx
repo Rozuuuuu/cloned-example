@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import {
   deleteScan,
   getRecentScans,
@@ -15,6 +14,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { useAuthGuard } from "@/hooks/use-auth-guard";
 
 const PAGE_SIZE = 20;
 
@@ -33,6 +33,7 @@ const csvCell = (v: string) => `"${(v ?? "").replace(/"/g, '""')}"`;
 
 const History = () => {
   const navigate = useNavigate();
+  const { session, checked } = useAuthGuard();
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
@@ -50,16 +51,12 @@ const History = () => {
   };
 
   useEffect(() => {
+    if (!session) return;
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/login", { replace: true });
-        return;
-      }
       await syncOfflineScans();
       await refresh();
     })();
-  }, [navigate]);
+  }, [navigate, session]);
 
   const handleDelete = (e: React.MouseEvent, s: ScanRecord) => {
     e.stopPropagation();
