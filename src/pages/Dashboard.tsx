@@ -135,22 +135,21 @@ const Dashboard = () => {
   const displayName = (() => {
     const u = session?.user;
     const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
-    const fromMeta =
-      (meta.full_name as string) ||
-      (meta.name as string) ||
-      (meta.display_name as string) ||
-      (meta.preferred_username as string);
-    if (fromMeta) return String(fromMeta).split(" ")[0];
+    const candidates = [
+      meta.full_name,
+      meta.name,
+      meta.display_name,
+      meta.preferred_username,
+      meta.user_name,
+      meta.given_name,
+      meta.first_name,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim()) return c.trim().split(/\s+/)[0];
+    }
     const email = u?.email;
     if (email) return email.split("@")[0];
     return "friend";
-  })();
-
-  const greeting = (() => {
-    const h = new Date().getHours();
-    if (h < 12) return "Good morning";
-    if (h < 18) return "Good afternoon";
-    return "Good evening";
   })();
 
   const formatDate = (iso: string) =>
@@ -171,11 +170,12 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-cream">
       {/* Header */}
-      <div className="rounded-b-[28px] bg-deep-sage px-5 pb-6 pt-12 text-cream md:px-10 md:pb-10 md:pt-16">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <div>
-            <p className="text-[13px] text-[#CCDDCB] md:text-sm">{greeting},</p>
-            <p className="text-xl font-bold md:text-2xl">{displayName} 👋</p>
+      <div className="rounded-b-[28px] bg-deep-sage px-4 pb-6 pt-10 text-cream sm:px-6 sm:pt-12 md:px-8 md:pb-8 md:pt-14 lg:px-10 lg:pt-16">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="truncate text-lg font-bold sm:text-xl md:text-2xl">
+              Good morning {displayName} 👋
+            </p>
           </div>
           <div className="flex gap-2.5">
             <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg">🔔</div>
@@ -200,7 +200,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mx-auto mt-4 w-full max-w-5xl rounded-3xl border border-white/20 bg-white/10 p-4 md:mt-6 md:p-6">
+        <div className="mx-auto mt-4 w-full max-w-6xl rounded-3xl border border-white/20 bg-white/10 p-4 sm:p-5 md:mt-6 md:p-6">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
             <div className="flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-terracotta/40 text-2xl">
               ☀️
@@ -237,8 +237,8 @@ const Dashboard = () => {
       </div>
 
       {/* Content */}
-      <div className="mx-auto w-full max-w-5xl space-y-4 px-5 pb-56 pt-5 md:grid md:grid-cols-2 md:gap-5 md:space-y-0 md:px-10 md:pb-32">
-        <div className="rounded-3xl bg-deep-sage p-5 text-cream md:col-span-1">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 px-4 pb-56 pt-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
+        <div className="rounded-3xl bg-deep-sage p-5 text-cream lg:col-span-1">
           <div className="flex items-center gap-2">
             <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
             <span className="text-[11px] font-semibold tracking-[0.15em] text-[#AACCAA]">
@@ -255,7 +255,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <div className="habi-card md:col-span-1 md:row-span-2">
+        <div className="habi-card lg:col-span-1 lg:row-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
             <button
@@ -318,7 +318,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="rounded-3xl bg-deep-sage p-5 text-cream md:col-span-1">
+        <div className="rounded-3xl bg-deep-sage p-5 text-cream lg:col-span-1">
           <div className="flex items-center gap-2">
             <span className="text-lg">🌿</span>
             <span className="font-bold">Eco Insights</span>
