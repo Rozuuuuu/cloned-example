@@ -18,6 +18,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import BottomNav from "@/components/BottomNav";
 import { signOutEverywhere, useAuthGuard } from "@/hooks/use-auth-guard";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -148,9 +150,16 @@ const Dashboard = () => {
       if (typeof c === "string" && c.trim()) return c.trim().split(/\s+/)[0];
     }
     const email = u?.email;
-    if (email) return email.split("@")[0];
+    if (typeof email === "string" && email.includes("@")) return email.split("@")[0];
     return "friend";
   })();
+
+  const avatarUrl = (() => {
+    const meta = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    const v = meta.avatar_url ?? meta.picture;
+    return typeof v === "string" && v ? v : undefined;
+  })();
+  const initials = (displayName || "?").slice(0, 2).toUpperCase();
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", {
@@ -159,23 +168,33 @@ const Dashboard = () => {
       year: "numeric",
     });
 
-  if (!checked || !weather) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-cream text-deep-sage">
-        Loading...
-      </div>
-    );
-  }
+  const isLoading = !checked || !weather;
 
   return (
     <div className="min-h-screen bg-cream">
       {/* Header */}
       <div className="rounded-b-[28px] bg-deep-sage px-4 pb-6 pt-10 text-cream sm:px-6 sm:pt-12 md:px-8 md:pb-8 md:pt-14 lg:px-10 lg:pt-16">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="truncate text-lg font-bold sm:text-xl md:text-2xl">
-              Good morning {displayName} 👋
-            </p>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            {isLoading ? (
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full bg-white/20" />
+            ) : (
+              <Avatar className="h-10 w-10 shrink-0 ring-2 ring-white/30 sm:h-11 sm:w-11">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            )}
+            {isLoading ? (
+              <Skeleton className="h-6 w-40 bg-white/20 sm:h-7 sm:w-56" />
+            ) : (
+              <p className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:truncate md:text-2xl">
+                <span className="whitespace-nowrap">Good morning </span>
+                <span className="break-words sm:break-normal sm:truncate">{displayName}</span>
+                <span className="whitespace-nowrap"> 👋</span>
+              </p>
+            )}
           </div>
           <div className="flex gap-2.5">
             <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg">🔔</div>
@@ -201,44 +220,64 @@ const Dashboard = () => {
         </div>
 
         <div className="mx-auto mt-4 w-full max-w-6xl rounded-3xl border border-white/20 bg-white/10 p-4 sm:p-5 md:mt-6 md:p-6">
+        {isLoading ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
+              <Skeleton className="h-[52px] w-[52px] rounded-2xl bg-white/20" />
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-32 bg-white/20" />
+                <Skeleton className="h-7 w-20 bg-white/20" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-3 w-16 bg-white/20" />
+                <Skeleton className="h-3 w-16 bg-white/20" />
+                <Skeleton className="h-3 w-16 bg-white/20" />
+              </div>
+            </div>
+            <Skeleton className="h-1.5 w-full bg-white/20" />
+          </div>
+        ) : (
+        <>
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
             <div className="flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-terracotta/40 text-2xl">
               ☀️
             </div>
             <div>
-              <div className="text-xs text-[#CCDDCB]">{weather.location}</div>
-              <div className="text-3xl font-bold leading-tight">{weather.temperature}°C</div>
+              <div className="text-xs text-[#CCDDCB]">{weather!.location}</div>
+              <div className="text-3xl font-bold leading-tight">{weather!.temperature}°C</div>
             </div>
             <div className="space-y-1 text-[11px]">
               <div className="flex items-center gap-1">
-                💧<span className="font-semibold">{humidityLabel(weather.humidity)}</span>
+                💧<span className="font-semibold">{humidityLabel(weather!.humidity)}</span>
               </div>
               <div className="flex items-center gap-1 text-[#AACCAA]">
-                💨<span>{weather.windSpeed} km/h</span>
+                💨<span>{weather!.windSpeed} km/h</span>
               </div>
               <div className="flex items-center gap-1 font-semibold text-terracotta">
-                🌡️<span>Feels {weather.feelsLike}°C</span>
+                🌡️<span>Feels {weather!.feelsLike}°C</span>
               </div>
             </div>
           </div>
           <div className="mt-3">
             <div className="flex items-center justify-between text-[10px]">
               <span className="text-[#AACCAA]">Humidity Index</span>
-              <span className="font-semibold text-terracotta">{fabricAdvice(weather.humidity)}</span>
+              <span className="font-semibold text-terracotta">{fabricAdvice(weather!.humidity)}</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-terracotta"
-                style={{ width: `${weather.humidity}%` }}
+                style={{ width: `${weather!.humidity}%` }}
               />
             </div>
           </div>
+        </>
+        )}
         </div>
       </div>
 
       {/* Content */}
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 px-4 pb-56 pt-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
-        <div className="rounded-3xl bg-deep-sage p-5 text-cream lg:col-span-1">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-stretch gap-4 px-4 pb-56 pt-5 sm:gap-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
+        <div className="flex flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6 lg:col-span-1">
           <div className="flex items-center gap-2">
             <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
             <span className="text-[11px] font-semibold tracking-[0.15em] text-[#AACCAA]">
@@ -246,7 +285,7 @@ const Dashboard = () => {
             </span>
           </div>
           <div className="mt-2 text-[22px] font-bold">{hulasLabel}</div>
-          <p className="mt-1 text-[13px] leading-6 text-[#CCDACC]">{hulasAdvice}</p>
+          <p className="mt-1 flex-1 text-[13px] leading-6 text-[#CCDACC]">{hulasAdvice}</p>
           <button
             onClick={() => navigate("/onboarding")}
             className="mt-2 text-xs text-[#AACCAA]"
@@ -255,7 +294,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <div className="habi-card lg:col-span-1 lg:row-span-2">
+        <div className="habi-card flex flex-col p-4 sm:p-5 md:p-6 lg:col-span-1 lg:row-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
             <button
@@ -265,7 +304,19 @@ const Dashboard = () => {
               See all
             </button>
           </div>
-          {scans.length === 0 ? (
+          {isLoading ? (
+            <div className="mt-3 space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-11 w-11 rounded-xl" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : scans.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
               No scans yet. Tap “Start Fabric Scan” to add your first item.
             </p>
@@ -318,7 +369,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="rounded-3xl bg-deep-sage p-5 text-cream lg:col-span-1">
+        <div className="flex flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6 lg:col-span-1">
           <div className="flex items-center gap-2">
             <span className="text-lg">🌿</span>
             <span className="font-bold">Eco Insights</span>
