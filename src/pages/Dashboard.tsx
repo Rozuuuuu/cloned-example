@@ -20,6 +20,8 @@ import BottomNav from "@/components/BottomNav";
 import { signOutEverywhere, useAuthGuard } from "@/hooks/use-auth-guard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { getDisplayName, getInitials } from "@/lib/display-name";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -134,32 +136,23 @@ const Dashboard = () => {
 
   const { label: hulasLabel, advice: hulasAdvice } = getHulasPersona(hulas);
 
-  const displayName = (() => {
-    const u = session?.user;
-    const meta = (u?.user_metadata ?? {}) as Record<string, unknown>;
-    const candidates = [
-      meta.full_name,
-      meta.name,
-      meta.display_name,
-      meta.preferred_username,
-      meta.user_name,
-      meta.given_name,
-      meta.first_name,
-    ];
-    for (const c of candidates) {
-      if (typeof c === "string" && c.trim()) return c.trim().split(/\s+/)[0];
-    }
-    const email = u?.email;
-    if (typeof email === "string" && email.includes("@")) return email.split("@")[0];
-    return "friend";
-  })();
+  const displayName = getDisplayName(session?.user ?? null);
 
   const avatarUrl = (() => {
     const meta = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
     const v = meta.avatar_url ?? meta.picture;
     return typeof v === "string" && v ? v : undefined;
   })();
-  const initials = (displayName || "?").slice(0, 2).toUpperCase();
+  const initials = getInitials(displayName);
+
+  const fullName = (() => {
+    const meta = (session?.user?.user_metadata ?? {}) as Record<string, unknown>;
+    for (const k of ["full_name", "name", "display_name"]) {
+      const v = meta[k];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return displayName;
+  })();
 
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString("en-US", {
@@ -177,21 +170,82 @@ const Dashboard = () => {
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isLoading ? (
-              <Skeleton className="h-10 w-10 shrink-0 rounded-full bg-white/20" />
+              <Skeleton className="h-11 w-11 shrink-0 rounded-full bg-white/20 sm:h-11 sm:w-11" />
             ) : (
-              <Avatar className="h-10 w-10 shrink-0 ring-2 ring-white/30 sm:h-11 sm:w-11">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
+              <Popover>
+                <PopoverTrigger
+                  aria-label="Open account menu"
+                  className="shrink-0 rounded-full outline-none ring-offset-2 ring-offset-deep-sage transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  <Avatar className="h-11 w-11 ring-2 ring-white/30">
+                    {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                    <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
+                      {initials}
+                    </AvatarFallback>
+                  </Avatar>
+                </PopoverTrigger>
+                <PopoverContent align="start" sideOffset={8} className="w-72 p-0">
+                  <div className="flex items-center gap-3 border-b border-border p-4">
+                    <Avatar className="h-12 w-12">
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                      <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {fullName}
+                      </div>
+                      {session?.user?.email && (
+                        <div className="truncate text-xs text-muted-foreground">
+                          {session.user.email}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-1 p-2 text-sm">
+                    <div className="flex items-center justify-between rounded-md px-3 py-2 text-muted-foreground">
+                      <span>Signed in with</span>
+                      <span className="font-medium text-foreground">
+                        {hasGoogle && hasEmail
+                          ? "Google + Email"
+                          : hasGoogle
+                            ? "Google"
+                            : hasEmail
+                              ? "Email"
+                              : "—"}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => navigate("/onboarding")}
+                      className="w-full rounded-md px-3 py-2 text-left hover:bg-muted"
+                    >
+                      Edit fabric profile
+                    </button>
+                    {hasEmail && !hasGoogle && (
+                      <button
+                        onClick={handleLinkGoogle}
+                        className="w-full rounded-md px-3 py-2 text-left hover:bg-muted"
+                      >
+                        Link Google account
+                      </button>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="w-full rounded-md px-3 py-2 text-left font-medium text-warning-red hover:bg-muted"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
             {isLoading ? (
-              <Skeleton className="h-6 w-40 bg-white/20 sm:h-7 sm:w-56" />
+              <Skeleton className="h-7 w-40 bg-white/20 sm:w-56" />
             ) : (
-              <p className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:truncate md:text-2xl">
+              <p className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:text-2xl">
                 <span className="whitespace-nowrap">Good morning </span>
-                <span className="break-words sm:break-normal sm:truncate">{displayName}</span>
+                <span className="break-words">{displayName}</span>
                 <span className="whitespace-nowrap"> 👋</span>
               </p>
             )}
@@ -276,8 +330,8 @@ const Dashboard = () => {
       </div>
 
       {/* Content */}
-      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-stretch gap-4 px-4 pb-56 pt-5 sm:gap-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
-        <div className="flex flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6 lg:col-span-1">
+      <div className="mx-auto grid w-full max-w-6xl auto-rows-fr grid-cols-1 items-stretch gap-4 px-4 pb-56 pt-5 sm:gap-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
+        <div className="flex h-full flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
           <div className="flex items-center gap-2">
             <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
             <span className="text-[11px] font-semibold tracking-[0.15em] text-[#AACCAA]">
@@ -294,7 +348,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        <div className="habi-card flex flex-col p-4 sm:p-5 md:p-6 lg:col-span-1 lg:row-span-2">
+        <div className="habi-card flex h-full flex-col p-4 sm:p-5 md:p-6 lg:row-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
             <button
@@ -369,7 +423,7 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="flex flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6 lg:col-span-1">
+        <div className="flex h-full flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
           <div className="flex items-center gap-2">
             <span className="text-lg">🌿</span>
             <span className="font-bold">Eco Insights</span>
