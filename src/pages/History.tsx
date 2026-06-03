@@ -4,7 +4,6 @@ import {
   deleteScan,
   getRecentScans,
   pruneImageCache,
-  resolveScanImage,
   sortScans,
   syncOfflineScans,
   type ScanRecord,
@@ -15,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useScanImages } from "@/hooks/use-scan-images";
 
 const PAGE_SIZE = 20;
 
