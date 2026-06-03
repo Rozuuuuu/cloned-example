@@ -70,7 +70,7 @@ const Dashboard = () => {
   };
 
   const refreshScans = async () => setScans(await getRecentScans(5));
-
+  const scanImages = useScanImages(scans);
 
   // Mirrors DashboardViewModel.LoadAsync — gate on auth, then load weather, profile, top-5 scans.
   useEffect(() => {
