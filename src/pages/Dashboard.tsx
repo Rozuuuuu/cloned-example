@@ -377,8 +377,9 @@ const Dashboard = () => {
             </p>
           ) : (
             <div className="mt-2 divide-y divide-border">
+              {(() => null)()}
               {scans.map((s) => {
-                const img = getScanImageUrl(s.imagePath);
+                const img = scanImages[s.id];
                 const isOffline = s.id.startsWith("offline:");
                 return (
                   <div
