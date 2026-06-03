@@ -18,6 +18,7 @@ const ScanDetail = () => {
   const scanId = decodeURIComponent(id);
   const [scan, setScan] = useState<ScanRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -26,6 +27,7 @@ const ScanDetail = () => {
       const found = await getScanById(scanId);
       setScan(found);
       setLoading(false);
+      setImageUrl(await resolveScanImage(found));
     })();
   }, [scanId]);
 
@@ -36,7 +38,6 @@ const ScanDetail = () => {
     [isSuccess]
   );
 
-  const imageUrl = resolveScanImage(scan);
   const gradient = isSuccess ? "var(--gradient-success)" : "var(--gradient-fail)";
   const gradeColor = isSuccess ? "#7BA05B" : "#D84545";
 
