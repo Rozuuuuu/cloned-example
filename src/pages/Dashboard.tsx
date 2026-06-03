@@ -5,7 +5,6 @@ import {
   deleteScan,
   getHulasPersona,
   getRecentScans,
-  getScanImageUrl,
   getWeather,
   humidityLabel,
   loadHulasFromProfile,
@@ -22,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { getDisplayName, getInitials } from "@/lib/display-name";
+import { useScanImages } from "@/hooks/use-scan-images";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -70,6 +70,7 @@ const Dashboard = () => {
   };
 
   const refreshScans = async () => setScans(await getRecentScans(5));
+  const scanImages = useScanImages(scans);
 
   // Mirrors DashboardViewModel.LoadAsync — gate on auth, then load weather, profile, top-5 scans.
   useEffect(() => {
@@ -376,8 +377,9 @@ const Dashboard = () => {
             </p>
           ) : (
             <div className="mt-2 divide-y divide-border">
+              {(() => null)()}
               {scans.map((s) => {
-                const img = getScanImageUrl(s.imagePath);
+                const img = scanImages[s.id];
                 const isOffline = s.id.startsWith("offline:");
                 return (
                   <div

@@ -4,7 +4,6 @@ import {
   deleteScan,
   getRecentScans,
   pruneImageCache,
-  resolveScanImage,
   sortScans,
   syncOfflineScans,
   type ScanRecord,
@@ -15,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
+import { useScanImages } from "@/hooks/use-scan-images";
 
 const PAGE_SIZE = 20;
 
@@ -122,6 +122,7 @@ const History = () => {
 
   const paged = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
   const hasMore = paged.length < filtered.length;
+  const scanImages = useScanImages(paged);
 
   // Infinite scroll: load more when the sentinel comes into view.
   useEffect(() => {
@@ -308,7 +309,7 @@ const History = () => {
         ) : (
           <div className="habi-card divide-y divide-border">
             {paged.map((s) => {
-              const img = resolveScanImage(s);
+              const img = scanImages[s.id];
               const isOffline = s.id.startsWith("offline:");
               return (
                 <div

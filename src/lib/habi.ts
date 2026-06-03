@@ -412,23 +412,33 @@ export const getScanById = async (id: string): Promise<ScanRecord | null> => {
   };
 };
 
-/** Returns a public URL for a stored scan image (bucket is public). */
-export const getScanImageUrl = (path?: string | null): string | undefined => {
+/** Returns a short-lived signed URL for a private scan image. */
+export const getScanImageUrl = async (
+  path?: string | null
+): Promise<string | undefined> => {
   if (!path) return undefined;
-  const { data } = supabase.storage.from("scan-images").getPublicUrl(path);
-  return data.publicUrl;
+  const { data, error } = await supabase.storage
+    .from("scan-images")
+    .createSignedUrl(path, 60 * 60); // 1 hour
+  if (error) return undefined;
+  return data?.signedUrl;
 };
 
-/** Offline-friendly resolver: prefers inline data URL, falls back to storage URL. */
-export const resolveScanImage = (scan?: ScanRecord | null): string | undefined => {
+/** Offline-friendly resolver: prefers inline data URL, falls back to a signed storage URL. */
+export const resolveScanImage = async (
+  scan?: ScanRecord | null
+): Promise<string | undefined> => {
   if (!scan) return undefined;
-  const url = scan.imageDataUrl || getScanImageUrl(scan.imagePath);
-  if (url) cacheScanImage(scan.id, url);
-  else {
-    const cached = getCachedScanImage(scan.id);
-    if (cached) return cached;
+  if (scan.imageDataUrl) {
+    cacheScanImage(scan.id, scan.imageDataUrl);
+    return scan.imageDataUrl;
   }
-  return url;
+  const url = await getScanImageUrl(scan.imagePath);
+  if (url) {
+    cacheScanImage(scan.id, url);
+    return url;
+  }
+  return getCachedScanImage(scan.id);
 };
 
 /**
