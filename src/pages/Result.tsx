@@ -22,7 +22,7 @@ const Result = () => {
     (async () => {
       const scans = await getRecentScans(10);
       const match = scans.find((s) => s.id === scanId);
-      setImageUrl(getScanImageUrl(match?.imagePath));
+      setImageUrl(await getScanImageUrl(match?.imagePath));
     })();
   }, [scanId]);
 
