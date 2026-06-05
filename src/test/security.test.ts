@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock the supabase client so we can assert RPC + select calls.
-const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
-const order2 = vi.fn().mockResolvedValue({ data: [], error: null });
-const order1 = vi.fn(() => ({ order: order2 }));
-const eq = vi.fn(() => ({ order: order1 }));
-const select = vi.fn(() => ({ eq }));
-const from = vi.fn(() => ({ select }));
+// Hoisted mock state so vi.mock factory can reach it.
+const { rpc, from, select, eq, order1, order2 } = vi.hoisted(() => {
+  const order2 = vi.fn().mockResolvedValue({ data: [], error: null });
+  const order1 = vi.fn(() => ({ order: order2 }));
+  const eq = vi.fn(() => ({ order: order1 }));
+  const select = vi.fn(() => ({ eq }));
+  const from = vi.fn(() => ({ select }));
+  const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+  return { rpc, from, select, eq, order1, order2 };
+});
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: { rpc, from },
