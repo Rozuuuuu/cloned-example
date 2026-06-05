@@ -10,6 +10,7 @@ import {
 } from "@/lib/habi";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import SecurityIssues from "@/components/SecurityIssues";
 
 /** Scan result detail — mirrors ResultPage but loads a saved record by id. */
 const ScanDetail = () => {
@@ -181,6 +182,8 @@ const ScanDetail = () => {
         >
           Scan Another Item
         </Button>
+
+        <SecurityIssues scanId={scan.id} />
       </div>
 
       <ConfirmDialog

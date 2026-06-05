@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logAuditEvent } from "@/lib/security";
 
 export type HulasLevel = "pawisin" | "normal" | "chill";
 
@@ -401,7 +402,22 @@ export const getScanById = async (id: string): Promise<ScanRecord | null> => {
     .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
     .eq("id", id)
     .maybeSingle();
-  if (error || !data) return null;
+  if (error || !data) {
+    void logAuditEvent({
+      action: "read",
+      resource_type: "scan",
+      resource_id: id,
+      success: false,
+      metadata: { reason: error?.message ?? "not_found", code: error?.code },
+    });
+    return null;
+  }
+  void logAuditEvent({
+    action: "read",
+    resource_type: "scan",
+    resource_id: id,
+    success: true,
+  });
   return {
     id: data.id as string,
     fabricName: data.fabric_name as string,
@@ -420,7 +436,22 @@ export const getScanImageUrl = async (
   const { data, error } = await supabase.storage
     .from("scan-images")
     .createSignedUrl(path, 60 * 60); // 1 hour
-  if (error) return undefined;
+  if (error) {
+    void logAuditEvent({
+      action: "sign_url",
+      resource_type: "scan_image",
+      resource_id: path,
+      success: false,
+      metadata: { error: error.message },
+    });
+    return undefined;
+  }
+  void logAuditEvent({
+    action: "sign_url",
+    resource_type: "scan_image",
+    resource_id: path,
+    success: true,
+  });
   return data?.signedUrl;
 };
 

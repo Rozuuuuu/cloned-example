@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { buildFabricResult, getRecentScans, getScanImageUrl } from "@/lib/habi";
+import SecurityIssues from "@/components/SecurityIssues";
 
 const Result = () => {
   const navigate = useNavigate();
@@ -143,6 +144,8 @@ const Result = () => {
         >
           Scan Another Item
         </Button>
+
+        <SecurityIssues scanId={scanId} />
       </div>
     </div>
   );

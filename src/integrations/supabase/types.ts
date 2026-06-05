@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          resource_id: string | null
+          resource_type: string
+          success: boolean
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type: string
+          success?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          resource_id?: string | null
+          resource_type?: string
+          success?: boolean
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -31,6 +64,47 @@ export type Database = {
           id?: string
         }
         Relationships: []
+      }
+      scan_findings: {
+        Row: {
+          affected_field: string
+          created_at: string
+          description: string | null
+          id: string
+          scan_id: string
+          severity: string
+          status: string
+          title: string
+        }
+        Insert: {
+          affected_field: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          scan_id: string
+          severity: string
+          status?: string
+          title: string
+        }
+        Update: {
+          affected_field?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          scan_id?: string
+          severity?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_findings_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scans: {
         Row: {
@@ -67,7 +141,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      log_audit_event: {
+        Args: {
+          _action: string
+          _metadata?: Json
+          _resource_id?: string
+          _resource_type: string
+          _success?: boolean
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
