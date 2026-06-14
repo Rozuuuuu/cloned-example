@@ -1,24 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoisted mock state so vi.mock factory can reach it.
-const { rpc, from, select, eq, order1, order2 } = vi.hoisted(() => {
+const { rpc, from, select, eq, order1, order2, invoke } = vi.hoisted(() => {
   const order2 = vi.fn().mockResolvedValue({ data: [], error: null });
   const order1 = vi.fn(() => ({ order: order2 }));
   const eq = vi.fn(() => ({ order: order1 }));
-  const select = vi.fn(() => ({ eq }));
+  // .select() returns a thenable shape that also exposes .eq and .order for
+  // both per-scan (eq → order → order) and connector (order → order) queries.
+  const select = vi.fn(() => ({ eq, order: order1 }));
   const from = vi.fn(() => ({ select }));
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
-  return { rpc, from, select, eq, order1, order2 };
+  const invoke = vi
+    .fn()
+    .mockResolvedValue({ data: { ok: true, ingested: 3 }, error: null });
+  return { rpc, from, select, eq, order1, order2, invoke };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc, from },
+  supabase: { rpc, from, functions: { invoke } },
 }));
 
 import {
   getScanFindings,
+  getConnectorFindings,
   logAuditEvent,
+  rescanAndReview,
   severityRank,
+  syncConnectorFindings,
 } from "@/lib/security";
 
 beforeEach(() => {
@@ -28,6 +36,7 @@ beforeEach(() => {
   eq.mockClear();
   order1.mockClear();
   order2.mockClear();
+  invoke.mockClear();
 });
 
 describe("severityRank", () => {
@@ -118,5 +127,86 @@ describe("getScanFindings", () => {
         _success: false,
       })
     );
+  });
+});
+
+describe("getConnectorFindings", () => {
+  it("queries connector_findings ordered by severity and logs a read audit", async () => {
+    order2.mockResolvedValueOnce({
+      data: [
+        {
+          id: "c1",
+          source: "wiz",
+          external_id: "wiz-1",
+          severity: "high",
+          affected_field: "storage.scan-images",
+          status: "open",
+          title: "t",
+          description: null,
+          storage_object_path: null,
+          created_at: "2026-01-01",
+          updated_at: "2026-01-01",
+        },
+      ],
+      error: null,
+    });
+    const out = await getConnectorFindings();
+    expect(out).toHaveLength(1);
+    expect(out[0].source).toBe("wiz");
+    expect(from).toHaveBeenCalledWith("connector_findings");
+    expect(rpc).toHaveBeenCalledWith(
+      "log_audit_event",
+      expect.objectContaining({
+        _action: "read",
+        _resource_type: "connector_findings",
+        _success: true,
+      })
+    );
+  });
+});
+
+describe("syncConnectorFindings", () => {
+  it("invokes the edge function and returns the ingested count", async () => {
+    const n = await syncConnectorFindings();
+    expect(invoke).toHaveBeenCalledWith("sync-connector-findings", { body: {} });
+    expect(n).toBe(3);
+  });
+
+  it("returns 0 on error", async () => {
+    invoke.mockResolvedValueOnce({ data: null, error: new Error("boom") });
+    expect(await syncConnectorFindings()).toBe(0);
+  });
+});
+
+describe("rescanAndReview", () => {
+  it("calls the rescan RPC, logs audit, then syncs connectors", async () => {
+    const ok = await rescanAndReview("scan-1");
+    expect(ok).toBe(true);
+    expect(rpc).toHaveBeenCalledWith("rescan_scan_findings", {
+      _scan_id: "scan-1",
+    });
+    expect(rpc).toHaveBeenCalledWith(
+      "log_audit_event",
+      expect.objectContaining({
+        _action: "rescan",
+        _resource_type: "scan",
+        _resource_id: "scan-1",
+        _success: true,
+      })
+    );
+    expect(invoke).toHaveBeenCalledWith("sync-connector-findings", { body: {} });
+  });
+
+  it("returns false and skips sync when the RPC errors", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { message: "denied" } });
+    const ok = await rescanAndReview("scan-2");
+    expect(ok).toBe(false);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("no-ops for offline scan ids", async () => {
+    const ok = await rescanAndReview("offline:abc");
+    expect(ok).toBe(false);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
