@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      connector_findings: {
+        Row: {
+          affected_field: string
+          created_at: string
+          description: string | null
+          external_id: string
+          id: string
+          severity: string
+          source: string
+          status: string
+          storage_object_path: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          affected_field: string
+          created_at?: string
+          description?: string | null
+          external_id: string
+          id?: string
+          severity: string
+          source: string
+          status?: string
+          storage_object_path?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          affected_field?: string
+          created_at?: string
+          description?: string | null
+          external_id?: string
+          id?: string
+          severity?: string
+          source?: string
+          status?: string
+          storage_object_path?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -151,6 +193,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      rescan_scan_findings: { Args: { _scan_id: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
