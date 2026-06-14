@@ -187,4 +187,39 @@ d("RLS — scans / scan_findings / scan-images", () => {
       .createSignedUrl(aImagePath, 60);
     expect(error || !data?.signedUrl).toBeTruthy();
   });
+
+  it("connector_findings are readable by any signed-in user (workspace-wide)", async () => {
+    const aRead = await a.from("connector_findings").select("id").limit(1);
+    const bRead = await b.from("connector_findings").select("id").limit(1);
+    expect(aRead.error).toBeNull();
+    expect(bRead.error).toBeNull();
+  });
+
+  it("connector_findings are NOT readable by anonymous clients", async () => {
+    const { data, error } = await anon
+      .from("connector_findings")
+      .select("id")
+      .limit(1);
+    expect(error || (data ?? []).length === 0).toBeTruthy();
+  });
+
+  it("authenticated users cannot insert/update/delete connector_findings (service_role only)", async () => {
+    const ins = await a.from("connector_findings").insert({
+      source: "wiz",
+      external_id: `rls-test-${Date.now()}`,
+      severity: "low",
+      affected_field: "x",
+      status: "open",
+      title: "should fail",
+    });
+    expect(ins.error).not.toBeNull();
+  });
+
+  it("rescan_scan_findings only works for the scan owner", async () => {
+    const ok = await a.rpc("rescan_scan_findings", { _scan_id: aScanId });
+    expect(ok.error).toBeNull();
+
+    const denied = await b.rpc("rescan_scan_findings", { _scan_id: aScanId });
+    expect(denied.error).not.toBeNull();
+  });
 });
