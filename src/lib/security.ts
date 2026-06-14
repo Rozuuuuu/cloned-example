@@ -87,3 +87,70 @@ export const statusClasses: Record<FindingStatus, string> = {
   acknowledged: "bg-amber-50 text-amber-700 border-amber-100",
   resolved: "bg-emerald-50 text-emerald-700 border-emerald-100",
 };
+
+export interface ConnectorFinding {
+  id: string;
+  source: string;
+  external_id: string;
+  severity: FindingSeverity;
+  affected_field: string;
+  status: FindingStatus;
+  title: string;
+  description: string | null;
+  storage_object_path: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Fetch workspace-wide connector findings (Wiz, etc.). */
+export const getConnectorFindings = async (): Promise<ConnectorFinding[]> => {
+  const { data, error } = await supabase
+    .from("connector_findings")
+    .select("*")
+    .order("severity", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) {
+    await logAuditEvent({
+      action: "read",
+      resource_type: "connector_findings",
+      success: false,
+      metadata: { error: error.message, code: error.code },
+    });
+    return [];
+  }
+  await logAuditEvent({
+    action: "read",
+    resource_type: "connector_findings",
+    success: true,
+    metadata: { count: data?.length ?? 0 },
+  });
+  return (data ?? []) as ConnectorFinding[];
+};
+
+/** Trigger the sync-connector-findings edge function. Returns ingested count. */
+export const syncConnectorFindings = async (): Promise<number> => {
+  const { data, error } = await supabase.functions.invoke<{
+    ok: boolean;
+    ingested: number;
+  }>("sync-connector-findings", { body: {} });
+  if (error || !data?.ok) return 0;
+  return data.ingested ?? 0;
+};
+
+/** Re-run a scan's auto-findings + connector ingestion. Owner-only via RPC. */
+export const rescanAndReview = async (scanId: string): Promise<boolean> => {
+  if (!scanId || scanId.startsWith("offline:")) return false;
+  const { error } = await supabase.rpc("rescan_scan_findings", {
+    _scan_id: scanId,
+  });
+  await logAuditEvent({
+    action: "rescan",
+    resource_type: "scan",
+    resource_id: scanId,
+    success: !error,
+    metadata: error ? { error: error.message } : null,
+  });
+  if (error) return false;
+  await syncConnectorFindings();
+  return true;
+};
