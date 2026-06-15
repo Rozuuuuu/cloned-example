@@ -133,8 +133,17 @@ export const syncConnectorFindings = async (): Promise<number> => {
     ok: boolean;
     ingested: number;
   }>("sync-connector-findings", { body: {} });
-  if (error || !data?.ok) return 0;
-  return data.ingested ?? 0;
+  const ok = !error && !!data?.ok;
+  await logAuditEvent({
+    action: "connector_sync_invoke",
+    resource_type: "connector_findings",
+    success: ok,
+    metadata: ok
+      ? { ingested: data?.ingested ?? 0 }
+      : { error: error?.message ?? "invoke_failed" },
+  });
+  if (!ok) return 0;
+  return data?.ingested ?? 0;
 };
 
 /** Re-run a scan's auto-findings + connector ingestion. Owner-only via RPC. */

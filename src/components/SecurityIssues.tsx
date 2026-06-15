@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getScanFindings,
   getConnectorFindings,
@@ -10,10 +10,21 @@ import {
   type ScanFinding,
 } from "@/lib/security";
 import { toast } from "sonner";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 interface Props {
   scanId?: string | null;
 }
+
+const PAGE_SIZE = 10;
 
 /** Security issues panel for a scan, plus workspace-wide connector findings. */
 const SecurityIssues = ({ scanId }: Props) => {
@@ -21,6 +32,8 @@ const SecurityIssues = ({ scanId }: Props) => {
   const [connector, setConnector] = useState<ConnectorFinding[] | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [tick, setTick] = useState(0);
+  const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +61,36 @@ const SecurityIssues = ({ scanId }: Props) => {
       cancelled = true;
     };
   }, [scanId, tick]);
+
+  // Distinct sources for the filter chips (always include "all").
+  const sources = useMemo(() => {
+    const set = new Set<string>();
+    (connector ?? []).forEach((f) => set.add(f.source));
+    return ["all", ...Array.from(set).sort()];
+  }, [connector]);
+
+  // Filter + sort by severity desc, then created_at desc (stable from query).
+  const filtered = useMemo(() => {
+    const list = connector ?? [];
+    const f = sourceFilter === "all"
+      ? list
+      : list.filter((x) => x.source === sourceFilter);
+    return [...f].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
+  }, [connector, sourceFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pageSlice = filtered.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+
+  // Reset page when filter changes or data reloads.
+  useEffect(() => {
+    setPage(1);
+  }, [sourceFilter, connector]);
 
   if (!scanId) return null;
 
@@ -162,8 +205,29 @@ const SecurityIssues = ({ scanId }: Props) => {
       )}
 
       {connector && connector.length > 0 && (
-        <ul className="mt-2 space-y-2">
-          {connector.map((f) => (
+        <>
+          {sources.length > 2 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" role="tablist" aria-label="Filter by source">
+              {sources.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSourceFilter(s)}
+                  role="tab"
+                  aria-selected={sourceFilter === s}
+                  className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider transition ${
+                    sourceFilter === s
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+          <ul className="mt-2 space-y-2">
+          {pageSlice.map((f) => (
             <li
               key={f.id}
               className="rounded-xl border border-border bg-card p-3"
@@ -194,7 +258,62 @@ const SecurityIssues = ({ scanId }: Props) => {
               )}
             </li>
           ))}
-        </ul>
+          </ul>
+          {totalPages > 1 && (
+            <Pagination className="mt-3">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    aria-disabled={safePage === 1}
+                    className={safePage === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }).slice(0, 5).map((_, i) => {
+                  const n = i + 1;
+                  return (
+                    <PaginationItem key={n}>
+                      <PaginationLink
+                        href="#"
+                        isActive={n === safePage}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(n);
+                        }}
+                      >
+                        {n}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+                {totalPages > 5 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    aria-disabled={safePage === totalPages}
+                    className={
+                      safePage === totalPages
+                        ? "pointer-events-none opacity-50"
+                        : ""
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
     </section>
   );
