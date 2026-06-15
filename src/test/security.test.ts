@@ -170,11 +170,26 @@ describe("syncConnectorFindings", () => {
     const n = await syncConnectorFindings();
     expect(invoke).toHaveBeenCalledWith("sync-connector-findings", { body: {} });
     expect(n).toBe(3);
+    expect(rpc).toHaveBeenCalledWith(
+      "log_audit_event",
+      expect.objectContaining({
+        _action: "connector_sync_invoke",
+        _resource_type: "connector_findings",
+        _success: true,
+      })
+    );
   });
 
   it("returns 0 on error", async () => {
     invoke.mockResolvedValueOnce({ data: null, error: new Error("boom") });
     expect(await syncConnectorFindings()).toBe(0);
+    expect(rpc).toHaveBeenCalledWith(
+      "log_audit_event",
+      expect.objectContaining({
+        _action: "connector_sync_invoke",
+        _success: false,
+      })
+    );
   });
 });
 
