@@ -181,6 +181,31 @@ const Login = () => {
           Continue as Guest
         </Button>
 
+        {guestErr && (
+          <div
+            role="alert"
+            aria-live="polite"
+            data-testid="guest-signin-error"
+            className="rounded-2xl border-2 border-warning-red/40 bg-warning-red/5 p-4 text-sm text-warning-red"
+          >
+            <p className="font-semibold">Guest sign-in didn't work</p>
+            <p className="mt-1 text-warning-red/90">
+              {guestErr.anonymousDisabled
+                ? "Anonymous sign-ins must be enabled in your backend auth settings before guest login can work."
+                : guestErr.message}
+            </p>
+            <Button
+              type="button"
+              onClick={handleGuest}
+              disabled={busy}
+              data-testid="guest-signin-retry"
+              className="mt-3 h-10 rounded-xl bg-warning-red text-cream hover:bg-warning-red/90"
+            >
+              Retry guest sign-in
+            </Button>
+          </div>
+        )}
+
         <Button
           type="button"
           onClick={handleGoogle}
