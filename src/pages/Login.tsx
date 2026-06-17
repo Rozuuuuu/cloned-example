@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { logAuditEvent } from "@/lib/security";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,6 +12,10 @@ const Login = () => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [guestErr, setGuestErr] = useState<{
+    message: string;
+    anonymousDisabled: boolean;
+  } | null>(null);
 
   // If already signed in, skip to dashboard (mirrors LoginPage Shell behavior).
   useEffect(() => {
@@ -49,12 +54,32 @@ const Login = () => {
   const handleGuest = async () => {
     setBusy(true);
     setError("");
+    setGuestErr(null);
+    await logAuditEvent({
+      action: "guest_signin_attempt",
+      resource_type: "auth",
+      success: true,
+    });
     try {
       const { error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
+      await logAuditEvent({
+        action: "guest_signin_success",
+        resource_type: "auth",
+        success: true,
+      });
       navigate("/dashboard");
     } catch (err) {
-      setError(`Guest sign-in failed: ${(err as Error).message}`);
+      const message = (err as Error).message ?? "Unknown error";
+      const anonymousDisabled =
+        /anonymous/i.test(message) && /disabl/i.test(message);
+      setGuestErr({ message, anonymousDisabled });
+      await logAuditEvent({
+        action: "guest_signin_failure",
+        resource_type: "auth",
+        success: false,
+        metadata: { error: message, anonymous_disabled: anonymousDisabled },
+      });
     } finally {
       setBusy(false);
     }
