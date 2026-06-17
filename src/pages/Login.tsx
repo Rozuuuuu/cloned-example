@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { logAuditEvent } from "@/lib/security";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -11,6 +12,10 @@ const Login = () => {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [guestErr, setGuestErr] = useState<{
+    message: string;
+    anonymousDisabled: boolean;
+  } | null>(null);
 
   // If already signed in, skip to dashboard (mirrors LoginPage Shell behavior).
   useEffect(() => {
@@ -49,12 +54,32 @@ const Login = () => {
   const handleGuest = async () => {
     setBusy(true);
     setError("");
+    setGuestErr(null);
+    await logAuditEvent({
+      action: "guest_signin_attempt",
+      resource_type: "auth",
+      success: true,
+    });
     try {
       const { error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
+      await logAuditEvent({
+        action: "guest_signin_success",
+        resource_type: "auth",
+        success: true,
+      });
       navigate("/dashboard");
     } catch (err) {
-      setError(`Guest sign-in failed: ${(err as Error).message}`);
+      const message = (err as Error).message ?? "Unknown error";
+      const anonymousDisabled =
+        /anonymous/i.test(message) && /disabl/i.test(message);
+      setGuestErr({ message, anonymousDisabled });
+      await logAuditEvent({
+        action: "guest_signin_failure",
+        resource_type: "auth",
+        success: false,
+        metadata: { error: message, anonymous_disabled: anonymousDisabled },
+      });
     } finally {
       setBusy(false);
     }
@@ -155,6 +180,31 @@ const Login = () => {
         >
           Continue as Guest
         </Button>
+
+        {guestErr && (
+          <div
+            role="alert"
+            aria-live="polite"
+            data-testid="guest-signin-error"
+            className="rounded-2xl border-2 border-warning-red/40 bg-warning-red/5 p-4 text-sm text-warning-red"
+          >
+            <p className="font-semibold">Guest sign-in didn't work</p>
+            <p className="mt-1 text-warning-red/90">
+              {guestErr.anonymousDisabled
+                ? "Anonymous sign-ins must be enabled in your backend auth settings before guest login can work."
+                : guestErr.message}
+            </p>
+            <Button
+              type="button"
+              onClick={handleGuest}
+              disabled={busy}
+              data-testid="guest-signin-retry"
+              className="mt-3 h-10 rounded-xl bg-warning-red text-cream hover:bg-warning-red/90"
+            >
+              Retry guest sign-in
+            </Button>
+          </div>
+        )}
 
         <Button
           type="button"
