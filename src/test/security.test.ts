@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoisted mock state so vi.mock factory can reach it.
-const { rpc, from, select, eq, order1, order2, invoke } = vi.hoisted(() => {
+const { rpc, from, select, eq, order1, order2, invoke, getUser } = vi.hoisted(() => {
   const order2 = vi.fn().mockResolvedValue({ data: [], error: null });
   const order1 = vi.fn(() => ({ order: order2 }));
   const eq = vi.fn(() => ({ order: order1 }));
@@ -13,11 +13,14 @@ const { rpc, from, select, eq, order1, order2, invoke } = vi.hoisted(() => {
   const invoke = vi
     .fn()
     .mockResolvedValue({ data: { ok: true, ingested: 3 }, error: null });
-  return { rpc, from, select, eq, order1, order2, invoke };
+  const getUser = vi
+    .fn()
+    .mockResolvedValue({ data: { user: { id: "u1", app_metadata: {} } } });
+  return { rpc, from, select, eq, order1, order2, invoke, getUser };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc, from, functions: { invoke } },
+  supabase: { rpc, from, functions: { invoke }, auth: { getUser } },
 }));
 
 import {
@@ -27,6 +30,8 @@ import {
   rescanAndReview,
   severityRank,
   syncConnectorFindings,
+  severityRationale,
+  toFindingsCsv,
 } from "@/lib/security";
 
 beforeEach(() => {
@@ -37,6 +42,81 @@ beforeEach(() => {
   order1.mockClear();
   order2.mockClear();
   invoke.mockClear();
+});
+
+describe("severityRationale", () => {
+  it("explains OSV.dev source", () => {
+    const r = severityRationale({
+      id: "x",
+      source: "osv",
+      external_id: "GHSA-1",
+      severity: "high",
+      affected_field: "deps",
+      status: "open",
+      title: "",
+      description: null,
+      storage_object_path: null,
+      created_at: "",
+      updated_at: "",
+    });
+    expect(r).toMatch(/OSV\.dev/);
+  });
+  it("explains generic connector source", () => {
+    const r = severityRationale({
+      id: "x",
+      source: "wiz",
+      external_id: "wiz-1",
+      severity: "high",
+      affected_field: "f",
+      status: "open",
+      title: "",
+      description: null,
+      storage_object_path: null,
+      created_at: "",
+      updated_at: "",
+    });
+    expect(r).toMatch(/connector_security_scan/);
+    expect(r).toMatch(/wiz/);
+  });
+  it("explains scan_findings rule for non-connector items", () => {
+    const r = severityRationale({
+      id: "1",
+      scan_id: "s1",
+      severity: "low",
+      affected_field: "fiber_type",
+      status: "open",
+      title: "",
+      description: null,
+      created_at: "",
+    });
+    expect(r).toMatch(/scan grade/);
+  });
+});
+
+describe("toFindingsCsv", () => {
+  it("emits header + escaped rows", () => {
+    const csv = toFindingsCsv([
+      {
+        id: "1",
+        source: "wiz",
+        external_id: "wiz-1",
+        severity: "high",
+        affected_field: "f",
+        status: "open",
+        title: 'has "quotes", and comma',
+        description: null,
+        storage_object_path: null,
+        created_at: "2026-01-01",
+        updated_at: "2026-01-01",
+      },
+    ]);
+    const [header, row] = csv.split("\n");
+    expect(header).toBe(
+      "id,source,severity,status,affected_field,title,description,created_at"
+    );
+    expect(row).toContain('"has ""quotes"", and comma"');
+    expect(row).toContain("wiz");
+  });
 });
 
 describe("severityRank", () => {
