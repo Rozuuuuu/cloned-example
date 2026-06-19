@@ -19,6 +19,8 @@ export const getScanFindings = async (
   scanId: string
 ): Promise<ScanFinding[]> => {
   if (!scanId || scanId.startsWith("offline:")) return [];
+  const { data: auth } = await supabase.auth.getUser();
+  const isAnon = !!(auth?.user?.app_metadata as { is_anonymous?: boolean } | undefined)?.is_anonymous;
   const { data, error } = await supabase
     .from("scan_findings")
     .select("*")
@@ -31,7 +33,7 @@ export const getScanFindings = async (
       resource_type: "scan_findings",
       resource_id: scanId,
       success: false,
-      metadata: { error: error.message, code: error.code },
+      metadata: { error: error.message, code: error.code, anonymous: isAnon },
     });
     return [];
   }
@@ -40,7 +42,7 @@ export const getScanFindings = async (
     resource_type: "scan_findings",
     resource_id: scanId,
     success: true,
-    metadata: { count: data?.length ?? 0 },
+    metadata: { count: data?.length ?? 0, anonymous: isAnon },
   });
   return (data ?? []) as ScanFinding[];
 };
@@ -104,6 +106,8 @@ export interface ConnectorFinding {
 
 /** Fetch workspace-wide connector findings (Wiz, etc.). */
 export const getConnectorFindings = async (): Promise<ConnectorFinding[]> => {
+  const { data: auth } = await supabase.auth.getUser();
+  const isAnon = !!(auth?.user?.app_metadata as { is_anonymous?: boolean } | undefined)?.is_anonymous;
   const { data, error } = await supabase
     .from("connector_findings")
     .select("*")
@@ -114,7 +118,7 @@ export const getConnectorFindings = async (): Promise<ConnectorFinding[]> => {
       action: "read",
       resource_type: "connector_findings",
       success: false,
-      metadata: { error: error.message, code: error.code },
+      metadata: { error: error.message, code: error.code, anonymous: isAnon },
     });
     return [];
   }
@@ -122,7 +126,7 @@ export const getConnectorFindings = async (): Promise<ConnectorFinding[]> => {
     action: "read",
     resource_type: "connector_findings",
     success: true,
-    metadata: { count: data?.length ?? 0 },
+    metadata: { count: data?.length ?? 0, anonymous: isAnon },
   });
   return (data ?? []) as ConnectorFinding[];
 };
@@ -162,4 +166,106 @@ export const rescanAndReview = async (scanId: string): Promise<boolean> => {
   if (error) return false;
   await syncConnectorFindings();
   return true;
+};
+
+/**
+ * Re-run findings for every scan the signed-in user owns AND refresh
+ * connector findings (Wiz / OSV). Returns counts for UI feedback.
+ */
+export const fullRescan = async (): Promise<{
+  ok: boolean;
+  scans: number;
+  ingested: number;
+}> => {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) {
+    await logAuditEvent({
+      action: "full_rescan",
+      resource_type: "scan",
+      success: false,
+      metadata: { error: "no_session" },
+    });
+    return { ok: false, scans: 0, ingested: 0 };
+  }
+  const { data: scans, error } = await supabase
+    .from("scans")
+    .select("id")
+    .eq("user_id", uid);
+  if (error) {
+    await logAuditEvent({
+      action: "full_rescan",
+      resource_type: "scan",
+      success: false,
+      metadata: { error: error.message },
+    });
+    return { ok: false, scans: 0, ingested: 0 };
+  }
+  const ids = (scans ?? []).map((s) => s.id as string);
+  let okAll = true;
+  for (const id of ids) {
+    const { error: rErr } = await supabase.rpc("rescan_scan_findings", {
+      _scan_id: id,
+    });
+    if (rErr) okAll = false;
+  }
+  const ingested = await syncConnectorFindings();
+  await logAuditEvent({
+    action: "full_rescan",
+    resource_type: "scan",
+    success: okAll,
+    metadata: { scans: ids.length, ingested },
+  });
+  return { ok: okAll, scans: ids.length, ingested };
+};
+
+/**
+ * Plain-English explanation of how a finding's severity was determined.
+ * Surfaced in the SecurityIssues tooltip so users can audit ranking logic.
+ */
+export const severityRationale = (
+  f: ScanFinding | ConnectorFinding
+): string => {
+  const isConnector = (x: ScanFinding | ConnectorFinding): x is ConnectorFinding =>
+    "source" in x;
+  if (isConnector(f)) {
+    if (f.source === "osv" || f.source === "osv.dev") {
+      return `Severity from OSV.dev advisory (source=${f.source}). Derived from CVSS / ecosystem rating on field "${f.affected_field}".`;
+    }
+    return `Severity from connector_security_scan (source=${f.source}, external_id=${f.external_id}). Field "${f.affected_field}".`;
+  }
+  return `Severity auto-derived from scan grade and presence of field "${f.affected_field}".`;
+};
+
+/** Build a CSV string for the given findings list. */
+export const toFindingsCsv = (
+  rows: Array<ScanFinding | ConnectorFinding>
+): string => {
+  const header = [
+    "id",
+    "source",
+    "severity",
+    "status",
+    "affected_field",
+    "title",
+    "description",
+    "created_at",
+  ];
+  const esc = (v: unknown) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = rows.map((r) =>
+    [
+      esc(r.id),
+      esc("source" in r ? r.source : "scan"),
+      esc(r.severity),
+      esc(r.status),
+      esc(r.affected_field),
+      esc(r.title),
+      esc(r.description ?? ""),
+      esc(r.created_at),
+    ].join(",")
+  );
+  return [header.join(","), ...lines].join("\n");
 };
