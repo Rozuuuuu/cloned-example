@@ -31,6 +31,7 @@ import {
   syncConnectorFindings,
   severityRationale,
   toFindingsCsv,
+  clearSecurityCache,
 } from "@/lib/security";
 
 beforeEach(() => {
@@ -42,6 +43,7 @@ beforeEach(() => {
   order2.mockClear();
   range.mockClear();
   invoke.mockClear();
+  clearSecurityCache();
 });
 
 describe("severityRationale", () => {
