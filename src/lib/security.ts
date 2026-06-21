@@ -1,4 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export type FindingSeverity = "low" | "medium" | "high" | "critical";
 export type FindingStatus = "open" | "acknowledged" | "resolved";
@@ -14,37 +16,113 @@ export interface ScanFinding {
   created_at: string;
 }
 
+export interface FetchOptions {
+  page?: number;
+  pageSize?: number;
+  /** Bypass in-memory cache. */
+  noCache?: boolean;
+  sourceFilter?: string;
+  severityFilter?: string;
+  sort?: string;
+}
+
+export interface Paginated<T> {
+  rows: T[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
+
+// Simple in-memory cache keyed by query signature. TTL ~ 30s.
+const CACHE_TTL_MS = 30_000;
+const _cache = new Map<string, { at: number; value: unknown }>();
+const cacheGet = <T,>(key: string): T | null => {
+  const hit = _cache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    _cache.delete(key);
+    return null;
+  }
+  return hit.value as T;
+};
+const cacheSet = (key: string, value: unknown) =>
+  _cache.set(key, { at: Date.now(), value });
+export const clearSecurityCache = () => _cache.clear();
+
 /** Fetch security findings for a scan. Logs read + any denial. */
 export const getScanFindings = async (
-  scanId: string
-): Promise<ScanFinding[]> => {
-  if (!scanId || scanId.startsWith("offline:")) return [];
+  scanId: string,
+  opts: FetchOptions = {}
+): Promise<Paginated<ScanFinding>> => {
+  const empty: Paginated<ScanFinding> = {
+    rows: [],
+    page: 1,
+    pageSize: opts.pageSize ?? 50,
+    total: 0,
+  };
+  if (!scanId || scanId.startsWith("offline:")) return empty;
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.max(1, Math.min(200, opts.pageSize ?? 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const sort = opts.sort ?? "severity_desc,created_at_desc";
+  const cacheKey = `sf:${scanId}:${page}:${pageSize}:${sort}`;
+  if (!opts.noCache) {
+    const cached = cacheGet<Paginated<ScanFinding>>(cacheKey);
+    if (cached) return cached;
+  }
   const { data: auth } = await supabase.auth.getUser();
   const isAnon = !!(auth?.user?.app_metadata as { is_anonymous?: boolean } | undefined)?.is_anonymous;
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("scan_findings")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("scan_id", scanId)
     .order("severity", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
   if (error) {
     await logAuditEvent({
       action: "read",
       resource_type: "scan_findings",
       resource_id: scanId,
       success: false,
-      metadata: { error: error.message, code: error.code, anonymous: isAnon },
+      metadata: {
+        error: error.message,
+        code: error.code,
+        anonymous: isAnon,
+        filters: { scan_id: scanId },
+        sort,
+        page,
+        pageSize,
+      },
     });
-    return [];
+    return empty;
   }
+  const rows = (data ?? []) as ScanFinding[];
   await logAuditEvent({
     action: "read",
     resource_type: "scan_findings",
     resource_id: scanId,
     success: true,
-    metadata: { count: data?.length ?? 0, anonymous: isAnon },
+    metadata: {
+      count: rows.length,
+      total: count ?? rows.length,
+      anonymous: isAnon,
+      filters: { scan_id: scanId },
+      sort,
+      page,
+      pageSize,
+      ids: rows.map((r) => r.id),
+    },
   });
-  return (data ?? []) as ScanFinding[];
+  const result: Paginated<ScanFinding> = {
+    rows,
+    page,
+    pageSize,
+    total: count ?? rows.length,
+  };
+  cacheSet(cacheKey, result);
+  return result;
 };
 
 export interface AuditEvent {
@@ -105,30 +183,73 @@ export interface ConnectorFinding {
 }
 
 /** Fetch workspace-wide connector findings (Wiz, etc.). */
-export const getConnectorFindings = async (): Promise<ConnectorFinding[]> => {
+export const getConnectorFindings = async (
+  opts: FetchOptions = {}
+): Promise<Paginated<ConnectorFinding>> => {
+  const page = Math.max(1, opts.page ?? 1);
+  const pageSize = Math.max(1, Math.min(200, opts.pageSize ?? 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+  const sourceFilter = opts.sourceFilter ?? "all";
+  const severityFilter = opts.severityFilter ?? "all";
+  const sort = opts.sort ?? "severity_desc,created_at_desc";
+  const cacheKey = `cf:${page}:${pageSize}:${sourceFilter}:${severityFilter}:${sort}`;
+  if (!opts.noCache) {
+    const cached = cacheGet<Paginated<ConnectorFinding>>(cacheKey);
+    if (cached) return cached;
+  }
   const { data: auth } = await supabase.auth.getUser();
   const isAnon = !!(auth?.user?.app_metadata as { is_anonymous?: boolean } | undefined)?.is_anonymous;
-  const { data, error } = await supabase
+  let q = supabase
     .from("connector_findings")
-    .select("*")
+    .select("*", { count: "exact" })
     .order("severity", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
+  if (sourceFilter !== "all") q = q.eq("source", sourceFilter);
+  if (severityFilter !== "all") q = q.eq("severity", severityFilter);
+  const { data, error, count } = await q;
   if (error) {
     await logAuditEvent({
       action: "read",
       resource_type: "connector_findings",
       success: false,
-      metadata: { error: error.message, code: error.code, anonymous: isAnon },
+      metadata: {
+        error: error.message,
+        code: error.code,
+        anonymous: isAnon,
+        filters: { source: sourceFilter, severity: severityFilter },
+        sort,
+        page,
+        pageSize,
+      },
     });
-    return [];
+    return { rows: [], page, pageSize, total: 0 };
   }
+  const rows = (data ?? []) as ConnectorFinding[];
   await logAuditEvent({
     action: "read",
     resource_type: "connector_findings",
     success: true,
-    metadata: { count: data?.length ?? 0, anonymous: isAnon },
+    metadata: {
+      count: rows.length,
+      total: count ?? rows.length,
+      anonymous: isAnon,
+      filters: { source: sourceFilter, severity: severityFilter },
+      sort,
+      page,
+      pageSize,
+      ids: rows.map((r) => r.id),
+    },
   });
-  return (data ?? []) as ConnectorFinding[];
+  const result: Paginated<ConnectorFinding> = {
+    rows,
+    page,
+    pageSize,
+    total: count ?? rows.length,
+  };
+  cacheSet(cacheKey, result);
+  return result;
 };
 
 /** Trigger the sync-connector-findings edge function. Returns ingested count. */
@@ -268,4 +389,42 @@ export const toFindingsCsv = (
     ].join(",")
   );
   return [header.join(","), ...lines].join("\n");
+};
+
+/** Build and download a PDF for the given findings list. */
+export const toFindingsPdf = (
+  rows: Array<ScanFinding | ConnectorFinding>,
+  opts: { sourceFilter?: string; severityFilter?: string; filename?: string } = {}
+): void => {
+  const doc = new jsPDF({ orientation: "landscape" });
+  const title = "Security Issues";
+  const subtitle = `source=${opts.sourceFilter ?? "all"} · severity=${
+    opts.severityFilter ?? "all"
+  } · ${rows.length} item(s)`;
+  doc.setFontSize(14);
+  doc.text(title, 14, 14);
+  doc.setFontSize(10);
+  doc.setTextColor(100);
+  doc.text(subtitle, 14, 20);
+  doc.setTextColor(0);
+  autoTable(doc, {
+    startY: 26,
+    head: [["Source", "Severity", "Status", "Field", "Title", "Created"]],
+    body: rows.map((r) => [
+      "source" in r ? r.source : "scan",
+      r.severity,
+      r.status,
+      r.affected_field,
+      r.title,
+      new Date(r.created_at).toISOString().slice(0, 10),
+    ]),
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [30, 30, 30] },
+  });
+  doc.save(
+    opts.filename ??
+      `security-issues-${opts.sourceFilter ?? "all"}-${
+        opts.severityFilter ?? "all"
+      }.pdf`
+  );
 };
