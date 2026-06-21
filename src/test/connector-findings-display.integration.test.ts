@@ -69,7 +69,7 @@ d("connector_security_scan findings — UI load + sort", () => {
     expect(isSorted(ranked)).toBe(true);
     // Module helper returns the same rows for the same session contract.
     const viaLib = await getConnectorFindings();
-    expect(Array.isArray(viaLib)).toBe(true);
+    expect(Array.isArray(viaLib.rows)).toBe(true);
   }, 30_000);
 
   it("guest user: connector findings access matches RLS policy", async () => {

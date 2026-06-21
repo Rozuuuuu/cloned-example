@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Hoisted mock state so vi.mock factory can reach it.
-const { rpc, from, select, eq, order1, order2, invoke, getUser } = vi.hoisted(() => {
-  const order2 = vi.fn().mockResolvedValue({ data: [], error: null });
+const { rpc, from, select, eq, order1, order2, range, invoke, getUser } = vi.hoisted(() => {
+  const range = vi.fn().mockResolvedValue({ data: [], error: null, count: 0 });
+  const order2 = vi.fn(() => ({ range, then: (cb: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null, count: 0 }).then(cb) }));
   const order1 = vi.fn(() => ({ order: order2 }));
-  const eq = vi.fn(() => ({ order: order1 }));
-  // .select() returns a thenable shape that also exposes .eq and .order for
-  // both per-scan (eq → order → order) and connector (order → order) queries.
+  const eq = vi.fn(() => ({ order: order1, eq: () => ({ order: order1 }) }));
   const select = vi.fn(() => ({ eq, order: order1 }));
   const from = vi.fn(() => ({ select }));
   const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
@@ -16,7 +15,7 @@ const { rpc, from, select, eq, order1, order2, invoke, getUser } = vi.hoisted(()
   const getUser = vi
     .fn()
     .mockResolvedValue({ data: { user: { id: "u1", app_metadata: {} } } });
-  return { rpc, from, select, eq, order1, order2, invoke, getUser };
+  return { rpc, from, select, eq, order1, order2, range, invoke, getUser };
 });
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -32,6 +31,7 @@ import {
   syncConnectorFindings,
   severityRationale,
   toFindingsCsv,
+  clearSecurityCache,
 } from "@/lib/security";
 
 beforeEach(() => {
@@ -41,7 +41,9 @@ beforeEach(() => {
   eq.mockClear();
   order1.mockClear();
   order2.mockClear();
+  range.mockClear();
   invoke.mockClear();
+  clearSecurityCache();
 });
 
 describe("severityRationale", () => {
@@ -155,13 +157,15 @@ describe("logAuditEvent", () => {
 
 describe("getScanFindings", () => {
   it("returns [] for empty/offline ids without touching the network", async () => {
-    expect(await getScanFindings("")).toEqual([]);
-    expect(await getScanFindings("offline:abc")).toEqual([]);
+    const a = await getScanFindings("");
+    const b = await getScanFindings("offline:abc");
+    expect(a.rows).toEqual([]);
+    expect(b.rows).toEqual([]);
     expect(from).not.toHaveBeenCalled();
   });
 
   it("queries scan_findings and logs a successful audit event", async () => {
-    order2.mockResolvedValueOnce({
+    range.mockResolvedValueOnce({
       data: [
         {
           id: "1",
@@ -175,9 +179,10 @@ describe("getScanFindings", () => {
         },
       ],
       error: null,
+      count: 1,
     });
     const out = await getScanFindings("s1");
-    expect(out).toHaveLength(1);
+    expect(out.rows).toHaveLength(1);
     expect(from).toHaveBeenCalledWith("scan_findings");
     expect(eq).toHaveBeenCalledWith("scan_id", "s1");
     expect(rpc).toHaveBeenCalledWith(
@@ -192,12 +197,13 @@ describe("getScanFindings", () => {
   });
 
   it("logs a failure audit event when the query errors", async () => {
-    order2.mockResolvedValueOnce({
+    range.mockResolvedValueOnce({
       data: null,
       error: { message: "permission denied", code: "42501" },
+      count: null,
     });
     const out = await getScanFindings("s2");
-    expect(out).toEqual([]);
+    expect(out.rows).toEqual([]);
     expect(rpc).toHaveBeenCalledWith(
       "log_audit_event",
       expect.objectContaining({
@@ -212,7 +218,7 @@ describe("getScanFindings", () => {
 
 describe("getConnectorFindings", () => {
   it("queries connector_findings ordered by severity and logs a read audit", async () => {
-    order2.mockResolvedValueOnce({
+    range.mockResolvedValueOnce({
       data: [
         {
           id: "c1",
@@ -229,10 +235,11 @@ describe("getConnectorFindings", () => {
         },
       ],
       error: null,
+      count: 1,
     });
     const out = await getConnectorFindings();
-    expect(out).toHaveLength(1);
-    expect(out[0].source).toBe("wiz");
+    expect(out.rows).toHaveLength(1);
+    expect(out.rows[0].source).toBe("wiz");
     expect(from).toHaveBeenCalledWith("connector_findings");
     expect(rpc).toHaveBeenCalledWith(
       "log_audit_event",
