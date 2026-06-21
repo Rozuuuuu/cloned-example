@@ -6,6 +6,8 @@ import {
   fullRescan,
   severityRationale,
   toFindingsCsv,
+  toFindingsPdf,
+  clearSecurityCache,
   severityClasses,
   severityRank,
   statusClasses,
@@ -35,6 +37,7 @@ interface Props {
 }
 
 const PAGE_SIZE = 10;
+const FETCH_PAGE_SIZE = 50;
 
 /** Security issues panel for a scan, plus workspace-wide connector findings. */
 const SecurityIssues = ({ scanId }: Props) => {
@@ -46,25 +49,36 @@ const SecurityIssues = ({ scanId }: Props) => {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [sevFilter, setSevFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [connectorTotal, setConnectorTotal] = useState(0);
+  const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const data = await getConnectorFindings();
+      const res = await getConnectorFindings({
+        page: 1,
+        pageSize: FETCH_PAGE_SIZE,
+        sourceFilter,
+        severityFilter: sevFilter,
+      });
       if (cancelled) return;
-      const sorted = [...data].sort(
+      const sorted = [...res.rows].sort(
         (a, b) => severityRank[b.severity] - severityRank[a.severity]
       );
       setConnector(sorted);
+      setConnectorTotal(res.total);
     })();
     if (!scanId) {
       setFindings([]);
       return;
     }
     (async () => {
-      const data = await getScanFindings(scanId);
+      const res = await getScanFindings(scanId, {
+        page: 1,
+        pageSize: FETCH_PAGE_SIZE,
+      });
       if (cancelled) return;
-      const sorted = [...data].sort(
+      const sorted = [...res.rows].sort(
         (a, b) => severityRank[b.severity] - severityRank[a.severity]
       );
       setFindings(sorted);
@@ -72,7 +86,7 @@ const SecurityIssues = ({ scanId }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [scanId, tick]);
+  }, [scanId, tick, sourceFilter, sevFilter]);
 
   // Distinct sources for the filter chips (always include "all").
   const sources = useMemo(() => {
@@ -111,8 +125,10 @@ const SecurityIssues = ({ scanId }: Props) => {
   const onRescan = async () => {
     if (!scanId || rescanning) return;
     setRescanning(true);
+    setProgress("Re-scanning…");
     setFindings(null);
     setConnector(null);
+    clearSecurityCache();
     const ok = await rescanAndReview(scanId);
     if (ok) {
       toast.success("Re-scan complete");
@@ -121,14 +137,27 @@ const SecurityIssues = ({ scanId }: Props) => {
     }
     setTick((t) => t + 1);
     setRescanning(false);
+    setProgress(null);
   };
 
   const onFullRescan = async () => {
-    if (fullScanning) return;
+    if (fullScanning || rescanning) return;
     setFullScanning(true);
+    setProgress("Re-running all scans…");
     setFindings(null);
     setConnector(null);
-    const res = await fullRescan();
+    clearSecurityCache();
+    let res: Awaited<ReturnType<typeof fullRescan>> = { ok: false, scans: 0, ingested: 0 };
+    try {
+      setProgress("Syncing connector findings…");
+      res = await fullRescan();
+    } catch (e) {
+      toast.error("Full re-scan failed");
+      setFullScanning(false);
+      setProgress(null);
+      setTick((t) => t + 1);
+      return;
+    }
     if (res.ok) {
       toast.success(
         `Full re-scan complete — ${res.scans} scan(s), ${res.ingested} connector findings`
@@ -138,6 +167,7 @@ const SecurityIssues = ({ scanId }: Props) => {
     }
     setTick((t) => t + 1);
     setFullScanning(false);
+    setProgress(null);
   };
 
   const onExportCsv = () => {
@@ -152,6 +182,14 @@ const SecurityIssues = ({ scanId }: Props) => {
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  };
+
+  const onExportPdf = () => {
+    const rows = [...(findings ?? []), ...filtered];
+    toFindingsPdf(rows, {
+      sourceFilter,
+      severityFilter: sevFilter,
+    });
   };
 
   return (
@@ -179,8 +217,16 @@ const SecurityIssues = ({ scanId }: Props) => {
           </button>
           <button
             type="button"
+            onClick={onExportPdf}
+            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted"
+          >
+            Export PDF
+          </button>
+          <button
+            type="button"
             onClick={onFullRescan}
-            disabled={fullScanning}
+            disabled={fullScanning || rescanning}
+            aria-busy={fullScanning}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
             {fullScanning ? "Full re-scanning…" : "Full re-scan"}
@@ -188,13 +234,24 @@ const SecurityIssues = ({ scanId }: Props) => {
           <button
             type="button"
             onClick={onRescan}
-            disabled={rescanning}
+            disabled={rescanning || fullScanning}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
             {rescanning ? "Re-scanning…" : "Re-scan and review"}
           </button>
         </div>
       </div>
+
+      {(fullScanning || rescanning) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          <span className="h-2 w-2 animate-pulse rounded-full bg-foreground/60" />
+          {progress ?? "Working…"}
+        </div>
+      )}
 
       {findings === null && (
         <div className="mt-3 space-y-2" aria-busy="true">
