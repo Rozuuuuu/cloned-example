@@ -473,8 +473,27 @@ const SecurityIssues = ({ scanId }: Props) => {
             </li>
           ))}
           </ul>
-          {totalPages > 1 && (
-            <Pagination className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <label htmlFor="page-size">Page size</label>
+              <select
+                id="page-size"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] text-foreground"
+              >
+                {[10, 25, 50, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span>
+                Page {safePage} of {totalPages} · {connectorTotal} total
+              </span>
+            </div>
+            {totalPages > 1 && (
+            <Pagination className="m-0 w-auto justify-end">
               <PaginationContent>
                 <PaginationItem>
                   <PaginationPrevious
@@ -526,7 +545,8 @@ const SecurityIssues = ({ scanId }: Props) => {
                 </PaginationItem>
               </PaginationContent>
             </Pagination>
-          )}
+            )}
+          </div>
         </>
       )}
     </section>
