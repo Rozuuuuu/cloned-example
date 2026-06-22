@@ -49,15 +49,17 @@ const SecurityIssues = ({ scanId }: Props) => {
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [sevFilter, setSevFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
   const [connectorTotal, setConnectorTotal] = useState(0);
+  const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
   const [progress, setProgress] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const res = await getConnectorFindings({
-        page: 1,
-        pageSize: FETCH_PAGE_SIZE,
+        page,
+        pageSize,
         sourceFilter,
         severityFilter: sevFilter,
       });
@@ -86,7 +88,7 @@ const SecurityIssues = ({ scanId }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [scanId, tick, sourceFilter, sevFilter]);
+  }, [scanId, tick, sourceFilter, sevFilter, page, pageSize]);
 
   // Distinct sources for the filter chips (always include "all").
   const sources = useMemo(() => {
@@ -108,17 +110,14 @@ const SecurityIssues = ({ scanId }: Props) => {
     );
   }, [connector, sourceFilter, sevFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(connectorTotal / pageSize));
   const safePage = Math.min(page, totalPages);
-  const pageSlice = filtered.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
-  );
+  const pageSlice = filtered;
 
-  // Reset page when filter changes or data reloads.
+  // Reset page when filter or page size changes.
   useEffect(() => {
     setPage(1);
-  }, [sourceFilter, sevFilter, connector]);
+  }, [sourceFilter, sevFilter, pageSize]);
 
   if (!scanId) return null;
 
@@ -170,26 +169,75 @@ const SecurityIssues = ({ scanId }: Props) => {
     setProgress(null);
   };
 
-  const onExportCsv = () => {
-    const rows = [...(findings ?? []), ...filtered];
-    const csv = toFindingsCsv(rows);
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `security-issues-${sourceFilter}-${sevFilter}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+  /** Fetch every page of connector findings matching the active filters/sort. */
+  const fetchAllFilteredConnector = async (): Promise<ConnectorFinding[]> => {
+    const acc: ConnectorFinding[] = [];
+    let p = 1;
+    // Hard cap to avoid runaway exports.
+    while (p <= 50) {
+      const res = await getConnectorFindings({
+        page: p,
+        pageSize: FETCH_PAGE_SIZE,
+        sourceFilter,
+        severityFilter: sevFilter,
+      });
+      acc.push(...res.rows);
+      if (acc.length >= res.total || res.rows.length === 0) break;
+      p += 1;
+    }
+    return [...acc].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
   };
 
-  const onExportPdf = () => {
-    const rows = [...(findings ?? []), ...filtered];
-    toFindingsPdf(rows, {
-      sourceFilter,
-      severityFilter: sevFilter,
-    });
+  const onExportCsv = async () => {
+    if (exporting) return;
+    setExporting("csv");
+    try {
+      const conn = await fetchAllFilteredConnector();
+      const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
+        (f) => sevFilter === "all" || f.severity === sevFilter
+      );
+      const rows = [...scanRows, ...conn];
+      const csv = toFindingsCsv(rows);
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `security-issues-${sourceFilter}-${sevFilter}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${rows.length} issue(s) to CSV`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("CSV export failed", { description: msg });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const onExportPdf = async () => {
+    if (exporting) return;
+    setExporting("pdf");
+    try {
+      const conn = await fetchAllFilteredConnector();
+      const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
+        (f) => sevFilter === "all" || f.severity === sevFilter
+      );
+      const rows = [...scanRows, ...conn];
+      toFindingsPdf(rows, {
+        sourceFilter,
+        severityFilter: sevFilter,
+      });
+      toast.success(`Exported ${rows.length} issue(s) to PDF`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("PDF export failed", { description: msg });
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -211,16 +259,18 @@ const SecurityIssues = ({ scanId }: Props) => {
           <button
             type="button"
             onClick={onExportCsv}
-            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted"
+            disabled={!!exporting}
+            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
-            Export CSV
+            {exporting === "csv" ? "Exporting…" : "Export CSV"}
           </button>
           <button
             type="button"
             onClick={onExportPdf}
-            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted"
+            disabled={!!exporting}
+            className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
-            Export PDF
+            {exporting === "pdf" ? "Exporting…" : "Export PDF"}
           </button>
           <button
             type="button"
