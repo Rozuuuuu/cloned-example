@@ -422,9 +422,53 @@ const SecurityIssues = ({ scanId }: Props) => {
       )}
 
       {connector && connector.length === 0 && (
-        <p className="mt-1 text-xs text-muted-foreground">
-          No connector findings (Wiz, etc.) reported.
-        </p>
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-2 rounded-xl border border-dashed border-border bg-muted/30 p-4 text-center"
+          data-testid="security-empty-state"
+        >
+          <p className="text-sm font-medium text-foreground">No issues found</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {sourceFilter === "all" && sevFilter === "all"
+              ? "No connector findings (Wiz, etc.) reported."
+              : `No findings match the current filters (source=${sourceFilter}, severity=${sevFilter}).`}
+          </p>
+          {(sourceFilter !== "all" || sevFilter !== "all") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSourceFilter("all");
+                setSevFilter("all");
+              }}
+              className="mt-2 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted"
+            >
+              Clear filters
+            </button>
+          )}
+          <div className="mt-3 flex items-center justify-center">
+            <Pagination className="m-0 w-auto">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    aria-disabled
+                    onClick={(e) => e.preventDefault()}
+                    className="pointer-events-none opacity-50"
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    aria-disabled
+                    onClick={(e) => e.preventDefault()}
+                    className="pointer-events-none opacity-50"
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          </div>
+        </div>
       )}
 
       {connector && connector.length > 0 && (
