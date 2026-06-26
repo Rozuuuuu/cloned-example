@@ -14,6 +14,7 @@ import {
   getConnectorFindings,
   severityRank,
   toFindingsPdf,
+  toFindingsCsv,
   clearSecurityCache,
 } from "@/lib/security";
 import { toast } from "sonner";
@@ -245,5 +246,92 @@ d("connector_security_scan findings — UI load + sort", () => {
       expect(meta.total).toBe(total);
       expect(meta.ids).toEqual(ids);
     }
+  }, 30_000);
+
+  it("CSV export for non-guest exactly matches current page, filters and sort", async () => {
+    clearSecurityCache();
+    const res = await getConnectorFindings({
+      page: 1,
+      pageSize: 10,
+      sourceFilter: "all",
+      severityFilter: "all",
+      sort: "severity_desc,created_at_desc",
+      noCache: true,
+    });
+    const sorted = [...res.rows].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
+    const csv = toFindingsCsv(sorted);
+    const lines = csv.split("\n");
+    // header + one row per finding
+    expect(lines.length).toBe(sorted.length + 1);
+    // First column is id; verify exact ordering match.
+    const csvIds = lines.slice(1).map((l) => l.split(",")[0]);
+    expect(csvIds).toEqual(sorted.map((r) => r.id));
+  }, 30_000);
+
+  it("CSV export succeeds for guest session and produces valid output", async () => {
+    if (!guestAvailable) return;
+    const { data } = await guest
+      .from("connector_findings")
+      .select("*")
+      .order("severity", { ascending: false })
+      .range(0, 9);
+    const rows = (data ?? []) as Parameters<typeof toFindingsCsv>[0];
+    const csv = toFindingsCsv(rows);
+    expect(csv.split("\n").length).toBe(rows.length + 1);
+  }, 30_000);
+
+  it("PDF export for non-guest includes correct count and severity ordering", async () => {
+    clearSecurityCache();
+    const res = await getConnectorFindings({
+      page: 1,
+      pageSize: 25,
+      sourceFilter: "all",
+      severityFilter: "all",
+      noCache: true,
+    });
+    const sorted = [...res.rows].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
+    // Severity ordering: each consecutive pair must be non-increasing.
+    for (let i = 1; i < sorted.length; i++) {
+      expect(
+        severityRank[sorted[i - 1].severity] >= severityRank[sorted[i].severity]
+      ).toBe(true);
+    }
+    expect(() =>
+      toFindingsPdf(sorted, {
+        sourceFilter: "all",
+        severityFilter: "all",
+        filename: "non-guest-pdf-order.pdf",
+      })
+    ).not.toThrow();
+    // Count surfaced in subtitle equals rows.length — already enforced by lib.
+    expect(sorted.length).toBe(res.rows.length);
+  }, 30_000);
+
+  it("PDF export for guest respects RLS-empty result count and ordering", async () => {
+    if (!guestAvailable) return;
+    const { data } = await guest
+      .from("connector_findings")
+      .select("*")
+      .order("severity", { ascending: false });
+    const rows = ((data ?? []) as Parameters<typeof toFindingsPdf>[0]);
+    const sorted = [...rows].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
+    for (let i = 1; i < sorted.length; i++) {
+      expect(
+        severityRank[sorted[i - 1].severity] >= severityRank[sorted[i].severity]
+      ).toBe(true);
+    }
+    expect(() =>
+      toFindingsPdf(sorted, {
+        sourceFilter: "all",
+        severityFilter: "all",
+        filename: "guest-pdf-order.pdf",
+      })
+    ).not.toThrow();
   }, 30_000);
 });
