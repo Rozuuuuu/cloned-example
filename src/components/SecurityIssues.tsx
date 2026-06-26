@@ -135,8 +135,6 @@ const SecurityIssues = ({ scanId }: Props) => {
   const totalPages = Math.max(1, Math.ceil(connectorTotal / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageSlice = filtered;
-  const isEmpty = connectorTotal === 0 && (connector?.length ?? 0) === 0;
-
   if (!scanId) return null;
 
   const onRescan = async () => {
