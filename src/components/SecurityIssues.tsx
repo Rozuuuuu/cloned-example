@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   getScanFindings,
   getConnectorFindings,
@@ -41,18 +42,39 @@ const FETCH_PAGE_SIZE = 50;
 
 /** Security issues panel for a scan, plus workspace-wide connector findings. */
 const SecurityIssues = ({ scanId }: Props) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [findings, setFindings] = useState<ScanFinding[] | null>(null);
   const [connector, setConnector] = useState<ConnectorFinding[] | null>(null);
   const [rescanning, setRescanning] = useState(false);
   const [fullScanning, setFullScanning] = useState(false);
   const [tick, setTick] = useState(0);
-  const [sourceFilter, setSourceFilter] = useState<string>("all");
-  const [sevFilter, setSevFilter] = useState<string>("all");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
+  const sourceFilter = searchParams.get("src") ?? "all";
+  const sevFilter = searchParams.get("sev") ?? "all";
+  const page = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+  const pageSize =
+    Number(searchParams.get("ps") ?? String(PAGE_SIZE)) || PAGE_SIZE;
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === null || v === "" || v === "all") next.delete(k);
+      else next.set(k, v);
+    }
+    setSearchParams(next, { replace: true });
+  };
+  const setSourceFilter = (v: string) =>
+    updateParams({ src: v === "all" ? null : v, page: null });
+  const setSevFilter = (v: string) =>
+    updateParams({ sev: v === "all" ? null : v, page: null });
+  const setPage = (updater: number | ((p: number) => number)) => {
+    const next = typeof updater === "function" ? updater(page) : updater;
+    updateParams({ page: next <= 1 ? null : String(next) });
+  };
+  const setPageSize = (n: number) =>
+    updateParams({ ps: n === PAGE_SIZE ? null : String(n), page: null });
   const [connectorTotal, setConnectorTotal] = useState(0);
   const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
   const [progress, setProgress] = useState<string | null>(null);
+  const [lastPdfError, setLastPdfError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,11 +135,7 @@ const SecurityIssues = ({ scanId }: Props) => {
   const totalPages = Math.max(1, Math.ceil(connectorTotal / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageSlice = filtered;
-
-  // Reset page when filter or page size changes.
-  useEffect(() => {
-    setPage(1);
-  }, [sourceFilter, sevFilter, pageSize]);
+  const isEmpty = connectorTotal === 0 && (connector?.length ?? 0) === 0;
 
   if (!scanId) return null;
 
@@ -218,23 +236,46 @@ const SecurityIssues = ({ scanId }: Props) => {
     }
   };
 
-  const onExportPdf = async () => {
+  const runPdfExport = async (attempt: number): Promise<void> => {
+    const conn = await fetchAllFilteredConnector();
+    const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
+      (f) => sevFilter === "all" || f.severity === sevFilter
+    );
+    const rows = [...scanRows, ...conn].sort(
+      (a, b) => severityRank[b.severity] - severityRank[a.severity]
+    );
+    toFindingsPdf(rows, {
+      sourceFilter,
+      severityFilter: sevFilter,
+    });
+    toast.success(
+      `Exported ${rows.length} issue(s) to PDF${attempt > 0 ? ` (retry ${attempt})` : ""}`
+    );
+    setLastPdfError(null);
+  };
+
+  const onExportPdf = async (attempt = 0) => {
     if (exporting) return;
     setExporting("pdf");
     try {
-      const conn = await fetchAllFilteredConnector();
-      const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
-        (f) => sevFilter === "all" || f.severity === sevFilter
-      );
-      const rows = [...scanRows, ...conn];
-      toFindingsPdf(rows, {
-        sourceFilter,
-        severityFilter: sevFilter,
-      });
-      toast.success(`Exported ${rows.length} issue(s) to PDF`);
+      await runPdfExport(attempt);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error("PDF export failed", { description: msg });
+      setLastPdfError(msg);
+      toast.error(
+        attempt > 0
+          ? `PDF export failed (after ${attempt + 1} attempts)`
+          : "PDF export failed",
+        {
+          description: `Last error: ${msg}`,
+          action: {
+            label: "Retry",
+            onClick: () => {
+              void onExportPdf(attempt + 1);
+            },
+          },
+        }
+      );
     } finally {
       setExporting(false);
     }
@@ -266,7 +307,7 @@ const SecurityIssues = ({ scanId }: Props) => {
           </button>
           <button
             type="button"
-            onClick={onExportPdf}
+            onClick={() => onExportPdf(0)}
             disabled={!!exporting}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
