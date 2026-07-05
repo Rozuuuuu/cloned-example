@@ -75,6 +75,7 @@ const SecurityIssues = ({ scanId }: Props) => {
   const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
   const [progress, setProgress] = useState<string | null>(null);
   const [lastPdfError, setLastPdfError] = useState<string | null>(null);
+  const [lastCsvError, setLastCsvError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,29 +207,50 @@ const SecurityIssues = ({ scanId }: Props) => {
     );
   };
 
-  const onExportCsv = async () => {
+  const runCsvExport = async (attempt: number): Promise<void> => {
+    const conn = await fetchAllFilteredConnector();
+    const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
+      (f) => sevFilter === "all" || f.severity === sevFilter
+    );
+    const rows = [...scanRows, ...conn];
+    const csv = toFindingsCsv(rows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `security-issues-${sourceFilter}-${sevFilter}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success(
+      `Exported ${rows.length} issue(s) to CSV${attempt > 0 ? ` (retry ${attempt})` : ""}`
+    );
+    setLastCsvError(null);
+  };
+
+  const onExportCsv = async (attempt = 0) => {
     if (exporting) return;
     setExporting("csv");
     try {
-      const conn = await fetchAllFilteredConnector();
-      const scanRows = (sourceFilter === "all" ? findings ?? [] : []).filter(
-        (f) => sevFilter === "all" || f.severity === sevFilter
-      );
-      const rows = [...scanRows, ...conn];
-      const csv = toFindingsCsv(rows);
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `security-issues-${sourceFilter}-${sevFilter}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast.success(`Exported ${rows.length} issue(s) to CSV`);
+      await runCsvExport(attempt);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      toast.error("CSV export failed", { description: msg });
+      setLastCsvError(msg);
+      toast.error(
+        attempt > 0
+          ? `CSV export failed (after ${attempt + 1} attempts)`
+          : "CSV export failed",
+        {
+          description: `Last error: ${msg}`,
+          action: {
+            label: "Retry",
+            onClick: () => {
+              void onExportCsv(attempt + 1);
+            },
+          },
+        }
+      );
     } finally {
       setExporting(false);
     }
@@ -297,7 +319,7 @@ const SecurityIssues = ({ scanId }: Props) => {
           )}
           <button
             type="button"
-            onClick={onExportCsv}
+            onClick={() => onExportCsv(0)}
             disabled={!!exporting}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
