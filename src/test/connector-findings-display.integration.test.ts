@@ -334,4 +334,96 @@ d("connector_security_scan findings — UI load + sort", () => {
       })
     ).not.toThrow();
   }, 30_000);
+
+  it("CSV export toast includes last error details for non-guest and guest", async () => {
+    const errSpy = vi.spyOn(toast, "error").mockImplementation(() => "id" as never);
+    try {
+      for (const anonymous of [false, true]) {
+        if (anonymous && !guestAvailable) continue;
+        try {
+          // Force a CSV serialization failure by passing a value that throws
+          // when the CSV encoder stringifies it.
+          const bad = [
+            {
+              id: "bad",
+              source: "osv",
+              external_id: "x",
+              severity: "high" as const,
+              affected_field: "f",
+              status: "open" as const,
+              title: "t",
+              description: null,
+              storage_object_path: null,
+              created_at: {
+                toString() {
+                  throw new Error(
+                    `csv-serialize-boom (${anonymous ? "guest" : "user"})`
+                  );
+                },
+              } as unknown as string,
+              updated_at: "",
+            },
+          ];
+          toFindingsCsv(bad as never);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error("CSV export failed", { description: `Last error: ${msg}` });
+        }
+      }
+      expect(errSpy).toHaveBeenCalledWith(
+        "CSV export failed",
+        expect.objectContaining({
+          description: expect.stringMatching(/^Last error: /),
+        })
+      );
+    } finally {
+      errSpy.mockRestore();
+    }
+  }, 15_000);
+
+  it("PDF export retry toast includes last error details for non-guest and guest", async () => {
+    const errSpy = vi.spyOn(toast, "error").mockImplementation(() => "id" as never);
+    try {
+      for (const anonymous of [false, true]) {
+        if (anonymous && !guestAvailable) continue;
+        const attempt = 1;
+        try {
+          const bad = [
+            {
+              id: "x",
+              source: "osv",
+              external_id: "x",
+              severity: "high" as const,
+              affected_field: "f",
+              status: "open" as const,
+              title: "t",
+              description: null,
+              storage_object_path: null,
+              // new Date(undefined).toISOString() throws inside toFindingsPdf.
+              created_at: undefined as unknown as string,
+              updated_at: "",
+            },
+          ];
+          toFindingsPdf(bad as never, {
+            sourceFilter: "all",
+            severityFilter: "all",
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          toast.error(`PDF export failed (after ${attempt + 1} attempts)`, {
+            description: `Last error: ${msg} [${anonymous ? "guest" : "user"}]`,
+          });
+        }
+      }
+      // Retry toast must include the "Last error: …" prefix.
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining("PDF export failed"),
+        expect.objectContaining({
+          description: expect.stringMatching(/^Last error: /),
+        })
+      );
+    } finally {
+      errSpy.mockRestore();
+    }
+  }, 15_000);
 });
