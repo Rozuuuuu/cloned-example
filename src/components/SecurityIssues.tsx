@@ -73,6 +73,7 @@ const SecurityIssues = ({ scanId }: Props) => {
     updateParams({ ps: n === PAGE_SIZE ? null : String(n), page: null });
   const [connectorTotal, setConnectorTotal] = useState(0);
   const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
+  const [exportAttempt, setExportAttempt] = useState(0);
   const [progress, setProgress] = useState<string | null>(null);
   const [lastPdfError, setLastPdfError] = useState<string | null>(null);
   const [lastCsvError, setLastCsvError] = useState<string | null>(null);
@@ -232,6 +233,7 @@ const SecurityIssues = ({ scanId }: Props) => {
   const onExportCsv = async (attempt = 0) => {
     if (exporting) return;
     setExporting("csv");
+    setExportAttempt(attempt);
     try {
       await runCsvExport(attempt);
     } catch (e) {
@@ -253,6 +255,7 @@ const SecurityIssues = ({ scanId }: Props) => {
       );
     } finally {
       setExporting(false);
+      setExportAttempt(0);
     }
   };
 
@@ -277,6 +280,7 @@ const SecurityIssues = ({ scanId }: Props) => {
   const onExportPdf = async (attempt = 0) => {
     if (exporting) return;
     setExporting("pdf");
+    setExportAttempt(attempt);
     try {
       await runPdfExport(attempt);
     } catch (e) {
@@ -298,6 +302,7 @@ const SecurityIssues = ({ scanId }: Props) => {
       );
     } finally {
       setExporting(false);
+      setExportAttempt(0);
     }
   };
 
@@ -323,7 +328,11 @@ const SecurityIssues = ({ scanId }: Props) => {
             disabled={!!exporting}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
-            {exporting === "csv" ? "Exporting…" : "Export CSV"}
+            {exporting === "csv"
+              ? exportAttempt > 0
+                ? `Retrying CSV… (attempt ${exportAttempt + 1})`
+                : "Exporting…"
+              : "Export CSV"}
           </button>
           <button
             type="button"
@@ -331,7 +340,11 @@ const SecurityIssues = ({ scanId }: Props) => {
             disabled={!!exporting}
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
-            {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+            {exporting === "pdf"
+              ? exportAttempt > 0
+                ? `Retrying PDF… (attempt ${exportAttempt + 1})`
+                : "Exporting…"
+              : "Export PDF"}
           </button>
           <button
             type="button"
@@ -361,6 +374,30 @@ const SecurityIssues = ({ scanId }: Props) => {
         >
           <span className="h-2 w-2 animate-pulse rounded-full bg-foreground/60" />
           {progress ?? "Working…"}
+        </div>
+      )}
+
+      {exporting && (
+        <div
+          role="status"
+          aria-live="polite"
+          data-testid="export-progress"
+          className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          <span className="h-2 w-2 animate-pulse rounded-full bg-foreground/60" />
+          {exportAttempt > 0
+            ? `Retrying ${exporting.toUpperCase()} export… (attempt ${exportAttempt + 1})`
+            : `Preparing ${exporting.toUpperCase()} export…`}
+          {exporting === "csv" && lastCsvError && (
+            <span className="ml-2 text-destructive">
+              Last error: {lastCsvError}
+            </span>
+          )}
+          {exporting === "pdf" && lastPdfError && (
+            <span className="ml-2 text-destructive">
+              Last error: {lastPdfError}
+            </span>
+          )}
         </div>
       )}
 

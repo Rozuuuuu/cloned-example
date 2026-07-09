@@ -19,4 +19,10 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
+  build: {
+    // Preview/prod builds: no source maps, no legacy per-chunk .map assets — keeps
+    // S3 PutObject volume low and avoids ServiceUnavailable rate-limit failures.
+    sourcemap: false,
+    reportCompressedSize: false,
+  },
 }));
