@@ -77,6 +77,17 @@ const SecurityIssues = ({ scanId }: Props) => {
   const [progress, setProgress] = useState<string | null>(null);
   const [lastPdfError, setLastPdfError] = useState<string | null>(null);
   const [lastCsvError, setLastCsvError] = useState<string | null>(null);
+  const [srAnnouncement, setSrAnnouncement] = useState<string>("");
+
+  const describeError = (e: unknown): string => {
+    if (e instanceof Error) {
+      const m = e.message?.trim();
+      return m && m.length > 0 ? m : "unavailable";
+    }
+    if (e === null || e === undefined) return "unavailable";
+    const s = String(e).trim();
+    return s && s !== "[object Object]" ? s : "unavailable";
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -234,11 +245,24 @@ const SecurityIssues = ({ scanId }: Props) => {
     if (exporting) return;
     setExporting("csv");
     setExportAttempt(attempt);
+    setSrAnnouncement(
+      attempt > 0
+        ? `Retrying CSV export, attempt ${attempt + 1}`
+        : "Starting CSV export"
+    );
     try {
       await runCsvExport(attempt);
+      setSrAnnouncement(
+        attempt > 0
+          ? `CSV export completed on attempt ${attempt + 1}`
+          : "CSV export completed"
+      );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = describeError(e);
       setLastCsvError(msg);
+      setSrAnnouncement(
+        `CSV export failed on attempt ${attempt + 1}. Last error: ${msg}`
+      );
       toast.error(
         attempt > 0
           ? `CSV export failed (after ${attempt + 1} attempts)`
@@ -281,11 +305,24 @@ const SecurityIssues = ({ scanId }: Props) => {
     if (exporting) return;
     setExporting("pdf");
     setExportAttempt(attempt);
+    setSrAnnouncement(
+      attempt > 0
+        ? `Retrying PDF export, attempt ${attempt + 1}`
+        : "Starting PDF export"
+    );
     try {
       await runPdfExport(attempt);
+      setSrAnnouncement(
+        attempt > 0
+          ? `PDF export completed on attempt ${attempt + 1}`
+          : "PDF export completed"
+      );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = describeError(e);
       setLastPdfError(msg);
+      setSrAnnouncement(
+        `PDF export failed on attempt ${attempt + 1}. Last error: ${msg}`
+      );
       toast.error(
         attempt > 0
           ? `PDF export failed (after ${attempt + 1} attempts)`
@@ -400,6 +437,16 @@ const SecurityIssues = ({ scanId }: Props) => {
           )}
         </div>
       )}
+
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="export-sr-announcer"
+        className="sr-only"
+      >
+        {srAnnouncement}
+      </div>
 
       {findings === null && (
         <div className="mt-3 space-y-2" aria-busy="true">

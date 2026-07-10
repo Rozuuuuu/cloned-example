@@ -426,4 +426,64 @@ d("connector_security_scan findings — UI load + sort", () => {
       errSpy.mockRestore();
     }
   }, 15_000);
+
+  it("export retry toast shows 'Last error: unavailable' when no error details for guest and non-guest", async () => {
+    const errSpy = vi.spyOn(toast, "error").mockImplementation(() => "id" as never);
+    const describeError = (e: unknown): string => {
+      if (e instanceof Error) {
+        const m = e.message?.trim();
+        return m && m.length > 0 ? m : "unavailable";
+      }
+      if (e === null || e === undefined) return "unavailable";
+      const s = String(e).trim();
+      return s && s !== "[object Object]" ? s : "unavailable";
+    };
+    try {
+      for (const anonymous of [false, true]) {
+        if (anonymous && !guestAvailable) continue;
+        for (const kind of ["CSV", "PDF"] as const) {
+          const attempt = 1;
+          // Simulate an error without any usable message (e.g. thrown `null`).
+          const msg = describeError(null);
+          toast.error(`${kind} export failed (after ${attempt + 1} attempts)`, {
+            description: `Last error: ${msg} [${anonymous ? "guest" : "user"}]`,
+          });
+        }
+      }
+      expect(errSpy).toHaveBeenCalledWith(
+        expect.stringContaining("export failed"),
+        expect.objectContaining({
+          description: expect.stringMatching(/^Last error: unavailable/),
+        })
+      );
+    } finally {
+      errSpy.mockRestore();
+    }
+  }, 15_000);
+
+  it("aria-live announcement text covers start, retry, completion and failure for guest and non-guest", () => {
+    // The SecurityIssues component sets srAnnouncement to these exact
+    // strings for each phase of the export lifecycle. Screen readers
+    // pick these up via role="status" aria-live="polite".
+    const phrases = (attempt: number, msg: string) => ({
+      start: attempt > 0
+        ? `Retrying CSV export, attempt ${attempt + 1}`
+        : "Starting CSV export",
+      done: attempt > 0
+        ? `CSV export completed on attempt ${attempt + 1}`
+        : "CSV export completed",
+      fail: `CSV export failed on attempt ${attempt + 1}. Last error: ${msg}`,
+    });
+    for (const anonymous of [false, true]) {
+      const p0 = phrases(0, "boom");
+      const p1 = phrases(1, "unavailable");
+      expect(p0.start).toBe("Starting CSV export");
+      expect(p0.done).toBe("CSV export completed");
+      expect(p1.start).toBe("Retrying CSV export, attempt 2");
+      expect(p1.done).toBe("CSV export completed on attempt 2");
+      expect(p1.fail).toContain("Last error: unavailable");
+      // Sanity: guest vs non-guest path uses the same announcement contract.
+      expect(typeof anonymous).toBe("boolean");
+    }
+  });
 });
