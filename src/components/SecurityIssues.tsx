@@ -438,6 +438,16 @@ const SecurityIssues = ({ scanId }: Props) => {
         </div>
       )}
 
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        data-testid="export-sr-announcer"
+        className="sr-only"
+      >
+        {srAnnouncement}
+      </div>
+
       {findings === null && (
         <div className="mt-3 space-y-2" aria-busy="true">
           <div className="h-12 animate-pulse rounded-lg bg-muted" />
