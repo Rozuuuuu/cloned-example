@@ -63,9 +63,9 @@ const renderPanel = () =>
 
 const announcer = () => screen.getByTestId("export-sr-announcer");
 const csvBtn = () =>
-  screen.getByRole("button", { name: /Export CSV|Retrying CSV|Exporting/ });
+  screen.getByRole("button", { name: /(Export|Retrying) CSV/ });
 const pdfBtn = () =>
-  screen.getByRole("button", { name: /Export PDF|Retrying PDF|Exporting/ });
+  screen.getByRole("button", { name: /(Export|Retrying) PDF/ });
 
 describe("SecurityIssues — aria-live export announcements", () => {
   it("CSV: announces completion without attempt number on first success", async () => {
