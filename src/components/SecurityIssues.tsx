@@ -363,6 +363,7 @@ const SecurityIssues = ({ scanId }: Props) => {
             type="button"
             onClick={() => onExportCsv(0)}
             disabled={!!exporting}
+            data-testid="export-csv-btn"
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
             {exporting === "csv"
@@ -375,6 +376,7 @@ const SecurityIssues = ({ scanId }: Props) => {
             type="button"
             onClick={() => onExportPdf(0)}
             disabled={!!exporting}
+            data-testid="export-pdf-btn"
             className="rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-foreground transition hover:bg-muted disabled:opacity-50"
           >
             {exporting === "pdf"
