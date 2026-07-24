@@ -44,10 +44,8 @@ beforeEach(() => {
   csvFailMessage = new Error("boom");
   toastSuccess.mockClear();
   toastError.mockClear();
-  // @ts-expect-error jsdom stub
-  URL.createObjectURL = vi.fn(() => "blob:x");
-  // @ts-expect-error jsdom stub
-  URL.revokeObjectURL = vi.fn();
+  (URL as unknown as { createObjectURL: () => string }).createObjectURL = vi.fn(() => "blob:x");
+  (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = vi.fn();
 });
 
 afterEach(() => cleanup());
