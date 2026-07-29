@@ -8,16 +8,16 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Habi-Check palette (HSL) */
-    --cream: 43 38% 96%;            /* #FCFBF8 */
-    --deep-sage: 110 13% 28%;       /* #3E5240 */
-    --sage-green: 89 28% 49%;       /* #7BA05B */
-    --terracotta: 16 47% 59%;       /* #C97B63 */
-    --warning-red: 0 64% 56%;       /* #D84545 */
-    --input-bg: 40 27% 92%;         /* #F2EEE5 */
-    --muted-line: 40 18% 86%;       /* muted divider */
-    --foreground-ink: 0 0% 16%;     /* #2A2A2A */
-    --muted-ink: 36 9% 47%;         /* #7A7468 */
+    /* Specimen Grid — Forest & Moss on paper (HSL) */
+    --cream: 44 60% 97%;            /* #fdfaf3 paper */
+    --deep-sage: 148 39% 17%;       /* #1a3c2a forest ink */
+    --sage-green: 122 21% 45%;      /* #5a8a5c moss */
+    --terracotta: 116 25% 69%;      /* #a0c49d pale moss */
+    --warning-red: 8 62% 44%;       /* clay red, kept for alerts */
+    --input-bg: 44 34% 93%;         /* pressed paper */
+    --muted-line: 148 20% 80%;      /* hairline rule */
+    --foreground-ink: 148 39% 17%;  /* ink = forest */
+    --muted-ink: 145 20% 38%;       /* #2d5a3d-ish */
 
     --background: var(--cream);
     --foreground: var(--foreground-ink);
@@ -47,12 +47,13 @@ All colors MUST be HSL.
     --input: var(--input-bg);
     --ring: var(--deep-sage);
 
-    --radius: 1.125rem;
+    --radius: 0rem;
 
-    --shadow-card: 0 10px 30px -12px hsl(var(--deep-sage) / 0.18);
-    --shadow-fab: 0 14px 30px -8px hsl(var(--deep-sage) / 0.45);
-    --gradient-success: linear-gradient(135deg, hsl(89 28% 49%), hsl(110 13% 36%));
-    --gradient-fail: linear-gradient(135deg, hsl(0 64% 56%), hsl(16 47% 59%));
+    /* Hard-edged specimen shadows: offset ink blocks, never soft glows. */
+    --shadow-card: 6px 6px 0 0 hsl(var(--deep-sage));
+    --shadow-fab: 6px 6px 0 0 hsl(var(--deep-sage));
+    --gradient-success: linear-gradient(180deg, hsl(var(--deep-sage)), hsl(var(--deep-sage)));
+    --gradient-fail: linear-gradient(180deg, hsl(8 62% 30%), hsl(8 62% 30%));
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -110,14 +111,39 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    font-family: 'Barlow', system-ui, -apple-system, sans-serif;
+    background-image:
+      linear-gradient(to right, hsl(var(--deep-sage) / 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--deep-sage) / 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Bebas Neue', 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.02em;
+    font-weight: 400;
   }
 }
 
 @layer components {
+  /* Specimen plate: paper panel bound by a stark ink rule. */
   .habi-card {
-    @apply bg-card rounded-3xl p-5;
-    box-shadow: var(--shadow-card);
+    @apply border-2 border-deep-sage bg-card p-5;
+  }
+
+  /* Small-caps index label used above every plate. */
+  .habi-label {
+    @apply text-[10px] font-bold uppercase tracking-[0.22em] text-sage-green;
+  }
+
+  /* Vertical masthead strip, as on the specimen sheet. */
+  .habi-spine {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
+  }
+
+  .habi-rule {
+    @apply border-t-2 border-deep-sage;
   }
 
   /* Subtle shimmer used by loading skeletons. Sits on top of whatever
