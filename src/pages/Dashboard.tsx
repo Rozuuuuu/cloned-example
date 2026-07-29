@@ -163,6 +163,7 @@ const Dashboard = () => {
     });
 
   const isLoading = !checked || !weather;
+  const today = formatDate(new Date().toISOString());
 
   return (
     <div className="min-h-screen bg-cream">
