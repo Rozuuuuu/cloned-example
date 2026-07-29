@@ -163,11 +163,18 @@ const Dashboard = () => {
     });
 
   const isLoading = !checked || !weather;
+  const today = formatDate(new Date().toISOString());
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Header */}
-      <div className="rounded-b-[28px] bg-deep-sage px-4 pb-6 pt-10 text-cream sm:px-6 sm:pt-12 md:px-8 md:pb-8 md:pt-14 lg:px-10 lg:pt-16">
+      {/* Masthead */}
+      <div className="border-b-2 border-deep-sage bg-deep-sage px-4 pb-6 pt-8 text-cream sm:px-6 md:px-8 md:pb-8 lg:px-10">
+        <div className="mx-auto mb-5 flex w-full max-w-6xl items-baseline justify-between gap-4 border-b-2 border-cream/30 pb-3">
+          <span className="font-display text-2xl uppercase tracking-tight">Habi-Check</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
+            Specimen Index · {today}
+          </span>
+        </div>
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isLoading ? (
@@ -244,10 +251,10 @@ const Dashboard = () => {
             {isLoading ? (
               <Skeleton className="h-7 w-40 bg-white/20 sm:w-56" />
             ) : (
-              <p className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:text-2xl">
+              <p className="min-w-0 flex-1 truncate font-display text-2xl uppercase sm:text-3xl md:text-4xl">
                 <span className="whitespace-nowrap">Good morning </span>
                 <span className="break-words">{displayName}</span>
-                <span className="whitespace-nowrap"> 👋</span>
+                <span className="whitespace-nowrap"> </span>
               </p>
             )}
           </div>
@@ -274,7 +281,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mx-auto mt-4 w-full max-w-6xl rounded-3xl border border-white/20 bg-white/10 p-4 sm:p-5 md:mt-6 md:p-6">
+        <div className="mx-auto mt-4 w-full max-w-6xl border-2 border-cream/40 p-4 sm:p-5 md:mt-6 md:p-6">
+          <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
+            Fig. 01 — Ambient conditions
+          </p>
         {isLoading ? (
           <div className="space-y-3">
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
@@ -332,14 +342,14 @@ const Dashboard = () => {
 
       {/* Content */}
       <div className="mx-auto grid w-full max-w-6xl auto-rows-fr grid-cols-1 items-stretch gap-4 px-4 pb-56 pt-5 sm:gap-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
-        <div className="flex h-full flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
-          <div className="flex items-center gap-2">
-            <div className="flex h-[30px] w-[30px] items-center justify-center rounded-full bg-white/20 text-base">🔥</div>
-            <span className="text-[11px] font-semibold tracking-[0.15em] text-[#AACCAA]">
-              FABRIC PERSONA
+        <div className="flex h-full flex-col border-2 border-deep-sage bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
+          <div className="flex items-center gap-2 border-b-2 border-cream/30 pb-2">
+            <span className="font-mono text-[10px] tracking-[0.2em] text-terracotta">02</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-terracotta">
+              Fabric Persona
             </span>
           </div>
-          <div className="mt-2 text-[22px] font-bold">{hulasLabel}</div>
+          <div className="mt-3 font-display text-4xl uppercase leading-none">{hulasLabel}</div>
           <p className="mt-1 flex-1 text-[13px] leading-6 text-[#CCDACC]">{hulasAdvice}</p>
           <button
             onClick={() => navigate("/onboarding")}
@@ -350,13 +360,13 @@ const Dashboard = () => {
         </div>
 
         <div className="habi-card flex h-full flex-col p-4 sm:p-5 md:p-6 lg:row-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-[22px] font-semibold text-deep-sage">Recent Scans</h2>
+          <div className="flex items-center justify-between border-b-2 border-deep-sage pb-2">
+            <h2 className="font-display text-3xl uppercase text-deep-sage">Recent Scans</h2>
             <button
               onClick={() => navigate("/history")}
-              className="text-sm font-semibold text-sage-green"
+              className="text-[10px] font-bold uppercase tracking-[0.2em] text-sage-green"
             >
-              See all
+              See all →
             </button>
           </div>
           {isLoading ? (
@@ -425,15 +435,15 @@ const Dashboard = () => {
           )}
         </div>
 
-        <div className="flex h-full flex-col rounded-3xl bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">🌿</span>
-            <span className="font-bold">Eco Insights</span>
+        <div className="flex h-full flex-col border-2 border-deep-sage bg-sage-green p-4 text-cream sm:p-5 md:p-6">
+          <div className="flex items-center gap-2 border-b-2 border-cream/40 pb-2">
+            <span className="font-mono text-[10px] tracking-[0.2em]">03</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.24em]">Field Notes</span>
           </div>
-          <div className="mt-3 space-y-3 text-[13px] text-[#CCDACC]">
-            <div className="flex gap-3"><span>♻️</span><span>Basahan upcycle trending this week</span></div>
-            <div className="flex gap-3"><span>🍃</span><span>Natural fibers reduce landfill by 40%</span></div>
-            <div className="flex gap-3"><span>📈</span><span>Pre-loved linen value up +12% this season</span></div>
+          <div className="mt-3 divide-y divide-cream/25 text-[13px]">
+            <p className="py-2">Basahan upcycle trending this week</p>
+            <p className="py-2">Natural fibers reduce landfill by 40%</p>
+            <p className="py-2">Pre-loved linen value up +12% this season</p>
           </div>
         </div>
       </div>
@@ -442,10 +452,10 @@ const Dashboard = () => {
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-20 px-5">
         <button
           onClick={() => navigate("/scanner")}
-          className="pointer-events-auto mx-auto block w-full max-w-md rounded-full border-[3px] border-cream bg-deep-sage px-7 py-4 text-[15px] font-bold text-cream"
+          className="pointer-events-auto mx-auto block w-full max-w-md border-2 border-deep-sage bg-terracotta px-7 py-4 font-display text-2xl uppercase tracking-tight text-deep-sage"
           style={{ boxShadow: "var(--shadow-fab)" }}
         >
-          📷 &nbsp;Start Fabric Scan
+          Start Fabric Scan →
         </button>
       </div>
       <BottomNav />

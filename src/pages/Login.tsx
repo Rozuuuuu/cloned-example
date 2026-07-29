@@ -102,93 +102,128 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream">
-      <div className="relative h-44 overflow-hidden">
-        <div className="absolute -left-20 -top-20 h-64 w-64 rounded-full bg-deep-sage opacity-[0.08]" />
-        <div className="absolute -right-12 -top-10 h-52 w-52 rounded-full bg-sage-green opacity-[0.08]" />
-      </div>
-
-      <div className="-mt-16 flex flex-col items-center gap-2">
-        <div
-          className="flex h-[90px] w-[90px] items-center justify-center rounded-3xl bg-deep-sage text-4xl"
-          style={{ boxShadow: "0 8px 16px hsl(var(--deep-sage) / 0.35)" }}
-        >
-          🔍🌿
-        </div>
-        <h1 className="font-bold text-[28px] text-deep-sage">Habi-Check</h1>
-        <p className="text-sm text-muted-foreground">Eco-conscious fabric scanner</p>
-      </div>
-
-      <form onSubmit={handleLogin} className="habi-card mx-5 mt-6 space-y-5 sm:mx-auto sm:max-w-md md:max-w-lg">
-        <div>
-          <h2 className="text-[22px] font-semibold text-deep-sage">
-            {mode === "login" ? "Welcome back" : "Create account"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {mode === "login" ? "Sign in to your account" : "Sign up to start scanning"}
-          </p>
+    <div className="min-h-screen bg-cream p-4 md:p-10">
+      <div className="mx-auto grid w-full max-w-6xl grid-cols-1 border-2 border-deep-sage bg-cream md:grid-cols-12">
+        {/* Spine */}
+        <div className="flex items-center justify-center bg-deep-sage py-5 text-cream md:col-span-1 md:border-r-2 md:border-deep-sage">
+          <span className="habi-spine font-display text-xs uppercase tracking-[0.28em]">
+            Sustainable Textile Intelligence · Issue 01
+          </span>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[13px] font-semibold text-deep-sage">Email</label>
-          <div className="rounded-2xl bg-input-bg px-4">
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="h-[52px] w-full bg-transparent text-sm outline-none placeholder:text-[#B0A99A]"
-            />
+        {/* Editorial plate */}
+        <div className="flex flex-col border-b-2 border-deep-sage md:col-span-7 md:border-b-0 md:border-r-2">
+          <div className="flex-grow p-8 md:p-12">
+            <h1 className="font-display text-[22vw] leading-[0.82] text-deep-sage md:text-[8rem]">
+              HABI
+              <br />
+              CHECK
+            </h1>
+            <div className="mt-8 grid grid-cols-2 gap-8 border-t-2 border-deep-sage pt-8">
+              <div>
+                <p className="habi-label mb-3">The Mission</p>
+                <p className="text-sm leading-relaxed text-deep-sage">
+                  Redefining the relationship between wearer and fiber. Habi-Check
+                  scans, analyses and decodes the tropical performance of every
+                  thread in your closet.
+                </p>
+              </div>
+              <div className="flex items-end justify-end">
+                <div className="flex h-24 w-24 items-center justify-center border-2 border-deep-sage bg-terracotta text-4xl">
+                  🧵
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mt-auto border-t-2 border-deep-sage bg-sage-green p-6 text-cream">
+            <p className="font-display text-4xl uppercase leading-none md:text-[3rem]">
+              Truth in every thread.
+            </p>
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[13px] font-semibold text-deep-sage">Password</label>
-          <div className="rounded-2xl bg-input-bg px-4">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="h-[52px] w-full bg-transparent text-sm outline-none placeholder:text-[#B0A99A]"
-            />
-          </div>
-        </div>
+        {/* Access plate */}
+        <div className="flex flex-col md:col-span-4">
+          <form onSubmit={handleLogin} className="flex flex-grow flex-col justify-center gap-6 p-8 md:p-10">
+            <h2 className="self-start border-b-4 border-terracotta font-display text-3xl text-deep-sage">
+              {mode === "login" ? "Account Access" : "New Contributor"}
+            </h2>
 
-        {error && <p className="text-xs text-warning-red">{error}</p>}
+            <div>
+              <label className="habi-label mb-2 block">Member Identifier</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="email@address.com"
+                className="w-full border-b-2 border-deep-sage bg-transparent py-3 text-sm text-deep-sage outline-none transition-colors placeholder:text-sage-green/60 focus:border-sage-green"
+              />
+            </div>
 
-        <Button
-          type="submit"
-          disabled={busy}
-          className="h-14 w-full rounded-2xl bg-deep-sage text-base font-bold text-cream hover:bg-deep-sage/90"
-        >
-          {busy ? "..." : mode === "login" ? "Login" : "Sign up"}
-        </Button>
+            <div>
+              <label className="habi-label mb-2 block">Secure Passkey</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border-b-2 border-deep-sage bg-transparent py-3 text-sm text-deep-sage outline-none transition-colors placeholder:text-sage-green/60 focus:border-sage-green"
+              />
+            </div>
 
-        <div className="flex items-center gap-2.5">
-          <div className="h-px flex-1 bg-border" />
-          <span className="text-xs text-[#B0A99A]">or</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
+            {error && <p className="text-xs font-semibold text-warning-red">{error}</p>}
 
-        <Button
-          type="button"
-          onClick={handleGuest}
-          disabled={busy}
-          variant="outline"
-          className="h-14 w-full rounded-2xl border-2 border-sage-green bg-transparent text-base font-bold text-deep-sage hover:bg-sage-green/10"
-        >
-          Continue as Guest
-        </Button>
+            <Button
+              type="submit"
+              disabled={busy}
+              className="group flex h-auto w-full items-center justify-between bg-deep-sage px-6 py-5 text-cream hover:bg-sage-green"
+            >
+              <span className="font-display text-xl uppercase tracking-tight">
+                {busy ? "Working…" : mode === "login" ? "Authenticate" : "Register"}
+              </span>
+              <span aria-hidden className="transition-transform group-hover:translate-x-1">→</span>
+            </Button>
 
-        {guestErr && (
+            <div className="flex items-center gap-3">
+              <span className="h-[2px] flex-1 bg-deep-sage/20" />
+              <span className="habi-label">or</span>
+              <span className="h-[2px] flex-1 bg-deep-sage/20" />
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleGuest}
+              disabled={busy}
+              variant="outline"
+              className="h-auto w-full border-2 border-deep-sage bg-transparent py-4 font-display text-xl uppercase tracking-tight text-deep-sage hover:bg-deep-sage hover:text-cream"
+            >
+              Continue as Guest
+            </Button>
+
+            <Button
+              type="button"
+              onClick={handleGoogle}
+              disabled={busy}
+              variant="outline"
+              className="h-auto w-full border-2 border-deep-sage bg-transparent py-4 font-display text-xl uppercase tracking-tight text-deep-sage hover:bg-deep-sage hover:text-cream"
+            >
+              <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
+              </svg>
+              Continue with Google
+            </Button>
+
+            {guestErr && (
           <div
             role="alert"
             aria-live="polite"
             data-testid="guest-signin-error"
-            className="rounded-2xl border-2 border-warning-red/40 bg-warning-red/5 p-4 text-sm text-warning-red"
+            className="border-2 border-warning-red bg-warning-red/5 p-4 text-sm text-warning-red"
           >
-            <p className="font-semibold">Guest sign-in didn't work</p>
+            <p className="font-display text-lg uppercase">Guest sign-in didn't work</p>
             <p className="mt-1 text-warning-red/90">
               {guestErr.anonymousDisabled
                 ? "Anonymous sign-ins must be enabled in your backend auth settings before guest login can work."
@@ -199,44 +234,30 @@ const Login = () => {
               onClick={handleGuest}
               disabled={busy}
               data-testid="guest-signin-retry"
-              className="mt-3 h-10 rounded-xl bg-warning-red text-cream hover:bg-warning-red/90"
+              className="mt-3 h-10 bg-warning-red text-cream hover:bg-warning-red/90"
             >
               Retry guest sign-in
             </Button>
           </div>
-        )}
+            )}
 
-        <Button
-          type="button"
-          onClick={handleGoogle}
-          disabled={busy}
-          variant="outline"
-          className="h-14 w-full rounded-2xl border-2 border-deep-sage bg-cream text-base font-bold text-deep-sage hover:bg-deep-sage/5"
-        >
-          <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.83C6.71 7.31 9.14 5.38 12 5.38z"/>
-          </svg>
-          Continue with Google
-        </Button>
-      </form>
+            <button
+              type="button"
+              onClick={() => {
+                setMode(mode === "login" ? "signup" : "login");
+                setError("");
+              }}
+              className="border-t-2 border-deep-sage pt-4 text-left text-xs font-bold uppercase tracking-widest text-deep-sage hover:text-sage-green"
+            >
+              {mode === "login" ? "Become a contributor →" : "Back to sign in →"}
+            </button>
+          </form>
 
-      <div className="mb-10 mt-5 flex justify-center gap-1 text-sm">
-        <span className="text-muted-foreground">
-          {mode === "login" ? "Don't have an account?" : "Already have an account?"}
-        </span>
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "login" ? "signup" : "login");
-            setError("");
-          }}
-          className="font-semibold text-terracotta"
-        >
-          {mode === "login" ? "Sign up" : "Sign in"}
-        </button>
+          <div className="grid grid-cols-2 border-t-2 border-deep-sage p-5 text-[9px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <div className="border-r-2 border-deep-sage pr-2">Protocol v.4.0.2</div>
+            <div className="pl-4 text-right">E-Scan Ready</div>
+          </div>
+        </div>
       </div>
     </div>
   );
