@@ -208,11 +208,11 @@ const History = () => {
 
   return (
     <div className="min-h-screen bg-cream pb-28">
-      <header className="rounded-b-[28px] bg-deep-sage px-5 pb-6 pt-12 text-cream">
+      <header className="border-b-2 border-deep-sage bg-deep-sage px-5 pb-6 pt-12 text-cream">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Scan History</h1>
-            <p className="mt-1 text-sm text-[#CCDDCB]">
+            <h1 className="font-display text-4xl uppercase">Scan History</h1>
+            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-terracotta">
               All your fabric scans, newest first.
             </p>
           </div>
