@@ -89,6 +89,45 @@ const SecurityIssues = ({ scanId }: Props) => {
     return s && s !== "[object Object]" ? s : "unavailable";
   };
 
+  /** Exponential backoff (ms) before the given retry attempt: 1s, 2s, 4s… capped at 30s. */
+  const backoffMs = (attempt: number) =>
+    attempt <= 0 ? 0 : Math.min(30_000, 1000 * 2 ** (attempt - 1));
+  const isTestEnv = import.meta.env.MODE === "test";
+  const wait = (ms: number) =>
+    new Promise<void>((r) => setTimeout(r, isTestEnv ? 0 : ms));
+
+  /** Downloadable plain-text report with the last export error details. */
+  const downloadErrorReport = (
+    kind: "CSV" | "PDF",
+    attempt: number,
+    message: string
+  ) => {
+    const lines = [
+      "HabiCheck — Export Error Report",
+      `Generated: ${new Date().toISOString()}`,
+      `Export type: ${kind}`,
+      `Attempts made: ${attempt + 1}`,
+      `Last error: ${message || "unavailable"}`,
+      `Source filter: ${sourceFilter}`,
+      `Severity filter: ${sevFilter}`,
+      `Page: ${page} (page size ${pageSize})`,
+      `Scan id: ${scanId ?? "unavailable"}`,
+      `URL: ${typeof window !== "undefined" ? window.location.href : "unavailable"}`,
+      `User agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "unavailable"}`,
+    ];
+    const blob = new Blob([lines.join("\n")], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `export-error-report-${kind.toLowerCase()}-${Date.now()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -251,6 +290,7 @@ const SecurityIssues = ({ scanId }: Props) => {
         : "Starting CSV export"
     );
     try {
+      if (attempt > 0) await wait(backoffMs(attempt));
       await runCsvExport(attempt);
       setSrAnnouncement(
         attempt > 0
@@ -270,10 +310,17 @@ const SecurityIssues = ({ scanId }: Props) => {
         {
           description: `Last error: ${msg}`,
           action: {
-            label: "Retry",
+            label:
+              attempt > 0
+                ? `Retry in ${Math.round(backoffMs(attempt + 1) / 1000)}s`
+                : "Retry",
             onClick: () => {
               void onExportCsv(attempt + 1);
             },
+          },
+          cancel: {
+            label: "Download report",
+            onClick: () => downloadErrorReport("CSV", attempt, msg),
           },
         }
       );
@@ -311,6 +358,7 @@ const SecurityIssues = ({ scanId }: Props) => {
         : "Starting PDF export"
     );
     try {
+      if (attempt > 0) await wait(backoffMs(attempt));
       await runPdfExport(attempt);
       setSrAnnouncement(
         attempt > 0
@@ -330,10 +378,17 @@ const SecurityIssues = ({ scanId }: Props) => {
         {
           description: `Last error: ${msg}`,
           action: {
-            label: "Retry",
+            label:
+              attempt > 0
+                ? `Retry in ${Math.round(backoffMs(attempt + 1) / 1000)}s`
+                : "Retry",
             onClick: () => {
               void onExportPdf(attempt + 1);
             },
+          },
+          cancel: {
+            label: "Download report",
+            onClick: () => downloadErrorReport("PDF", attempt, msg),
           },
         }
       );
