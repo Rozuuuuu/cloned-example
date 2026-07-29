@@ -166,8 +166,14 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-cream">
-      {/* Header */}
-      <div className="rounded-b-[28px] bg-deep-sage px-4 pb-6 pt-10 text-cream sm:px-6 sm:pt-12 md:px-8 md:pb-8 md:pt-14 lg:px-10 lg:pt-16">
+      {/* Masthead */}
+      <div className="border-b-2 border-deep-sage bg-deep-sage px-4 pb-6 pt-8 text-cream sm:px-6 md:px-8 md:pb-8 lg:px-10">
+        <div className="mx-auto mb-5 flex w-full max-w-6xl items-baseline justify-between gap-4 border-b-2 border-cream/30 pb-3">
+          <span className="font-display text-2xl uppercase tracking-tight">Habi-Check</span>
+          <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
+            Specimen Index · {today}
+          </span>
+        </div>
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             {isLoading ? (
@@ -244,10 +250,10 @@ const Dashboard = () => {
             {isLoading ? (
               <Skeleton className="h-7 w-40 bg-white/20 sm:w-56" />
             ) : (
-              <p className="min-w-0 flex-1 truncate text-lg font-bold sm:text-xl md:text-2xl">
+              <p className="min-w-0 flex-1 truncate font-display text-2xl uppercase sm:text-3xl md:text-4xl">
                 <span className="whitespace-nowrap">Good morning </span>
                 <span className="break-words">{displayName}</span>
-                <span className="whitespace-nowrap"> 👋</span>
+                <span className="whitespace-nowrap"> </span>
               </p>
             )}
           </div>
@@ -274,7 +280,10 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div className="mx-auto mt-4 w-full max-w-6xl rounded-3xl border border-white/20 bg-white/10 p-4 sm:p-5 md:mt-6 md:p-6">
+        <div className="mx-auto mt-4 w-full max-w-6xl border-2 border-cream/40 p-4 sm:p-5 md:mt-6 md:p-6">
+          <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
+            Fig. 01 — Ambient conditions
+          </p>
         {isLoading ? (
           <div className="space-y-3">
             <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
