@@ -1,9 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
 
 const tabs = [
-  { to: "/dashboard", label: "Home", icon: "🏠" },
-  { to: "/scanner", label: "Scan", icon: "📷" },
-  { to: "/history", label: "History", icon: "🧺" },
+  { to: "/dashboard", label: "Index", icon: "01" },
+  { to: "/scanner", label: "Scan", icon: "02" },
+  { to: "/history", label: "Closet", icon: "03" },
 ];
 
 /** Persistent bottom navigation shown on the main app screens. */
@@ -13,7 +13,7 @@ export const BottomNav = () => {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md items-center justify-around border-t border-border bg-cream/95 px-3 py-2 backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-2xl items-stretch border-t-2 border-deep-sage bg-cream"
     >
       {tabs.map((t) => {
         const active = pathname === t.to || pathname.startsWith(t.to + "/");
@@ -21,13 +21,13 @@ export const BottomNav = () => {
           <button
             key={t.to}
             onClick={() => navigate(t.to)}
-            className={`flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-2 py-1.5 text-[11px] font-semibold transition-colors ${
-              active ? "text-deep-sage" : "text-muted-foreground"
+            className={`flex flex-1 flex-col items-center gap-0.5 border-r-2 border-deep-sage px-2 py-3 transition-colors last:border-r-0 ${
+              active ? "bg-deep-sage text-cream" : "bg-cream text-deep-sage hover:bg-terracotta/30"
             }`}
             aria-current={active ? "page" : undefined}
           >
-            <span className="text-xl leading-none">{t.icon}</span>
-            <span>{t.label}</span>
+            <span className="font-mono text-[9px] tracking-[0.2em] opacity-70">{t.icon}</span>
+            <span className="font-display text-lg uppercase leading-none">{t.label}</span>
           </button>
         );
       })}
