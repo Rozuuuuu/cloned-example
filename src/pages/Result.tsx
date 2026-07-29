@@ -57,19 +57,16 @@ const Result = () => {
           </div>
         )}
 
-        <div
-          className="mx-auto mt-5 flex h-32 w-32 flex-col items-center justify-center rounded-full bg-white"
-          style={{ boxShadow: "0 10px 20px rgba(0,0,0,0.25)" }}
-        >
-          <span className="text-[42px] font-bold leading-none" style={{ color: gradeColor }}>
+        <div className="mx-auto mt-5 flex h-32 w-32 flex-col items-center justify-center border-2 border-cream bg-cream">
+          <span className="font-display text-[56px] leading-none" style={{ color: gradeColor }}>
             {fabric.grade}
           </span>
-          <span className="text-[11px] font-semibold tracking-wider text-[#888]">GRADE</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-deep-sage">Grade</span>
         </div>
 
         <div className="mt-3 text-center">
-          <h1 className="text-2xl font-bold">{fabric.name}</h1>
-          <p className="text-sm opacity-80">{fabric.fiberType}</p>
+          <h1 className="font-display text-4xl uppercase">{fabric.name}</h1>
+          <p className="text-[10px] font-bold uppercase tracking-[0.24em] opacity-80">{fabric.fiberType}</p>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3">
