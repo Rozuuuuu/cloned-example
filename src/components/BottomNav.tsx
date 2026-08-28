@@ -26,8 +26,9 @@ export const BottomNav = () => {
             }`}
             aria-current={active ? "page" : undefined}
           >
-            <span className="font-mono text-[9px] tracking-[0.2em] opacity-70">{t.icon}</span>
-            <span className="font-display text-lg uppercase leading-none">{t.label}</span>
+            <span className="type-mono opacity-70">{t.icon}</span>
+            <span className="type-h3">{t.label}</span>
+
           </button>
         );
       })}
