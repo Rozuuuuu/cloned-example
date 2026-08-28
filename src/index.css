@@ -146,6 +146,37 @@ All colors MUST be HSL.
 }
 
 @layer components {
+  /* ---- Typography scale (Bebas Neue display / Barlow body) -------------
+     Every screen uses these, so headers, body copy and captions stay
+     identical across Login, Dashboard, History, Result and BottomNav. */
+  .type-display {
+    @apply font-display uppercase leading-[0.82] text-[18vw] md:text-[7rem];
+  }
+  .type-h1 {
+    @apply font-display uppercase leading-none text-3xl sm:text-4xl md:text-5xl;
+  }
+  .type-h2 {
+    @apply font-display uppercase leading-none text-2xl sm:text-3xl;
+  }
+  .type-h3 {
+    @apply font-display uppercase leading-none tracking-tight text-xl sm:text-2xl;
+  }
+  .type-label {
+    @apply text-[10px] font-bold uppercase tracking-[0.24em];
+  }
+  .type-body {
+    @apply text-[13px] leading-6 sm:text-sm;
+  }
+  .type-caption {
+    @apply text-[11px] leading-5 text-muted-foreground;
+  }
+  .type-mono {
+    @apply font-mono text-[10px] uppercase tracking-[0.2em];
+  }
+}
+
+@layer components {
+
   /* Specimen plate: paper panel bound by a stark ink rule. */
   .habi-card {
     @apply border-2 border-deep-sage bg-card p-5;
