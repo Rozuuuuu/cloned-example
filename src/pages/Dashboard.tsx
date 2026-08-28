@@ -165,157 +165,108 @@ const Dashboard = () => {
   const isLoading = !checked || !weather;
   const today = formatDate(new Date().toISOString());
 
-  return (
-    <div className="min-h-screen bg-cream">
-      {/* Masthead */}
-      <div className="border-b-2 border-deep-sage bg-deep-sage px-4 pb-6 pt-8 text-cream sm:px-6 md:px-8 md:pb-8 lg:px-10">
-        <div className="mx-auto mb-5 flex w-full max-w-6xl items-baseline justify-between gap-4 border-b-2 border-cream/30 pb-3">
-          <span className="font-display text-2xl uppercase tracking-tight">Habi-Check</span>
-          <span className="text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
-            Specimen Index · {today}
-          </span>
-        </div>
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            {isLoading ? (
-              <Skeleton className="h-11 w-11 shrink-0 rounded-full bg-white/20 sm:h-11 sm:w-11" />
-            ) : (
-              <Popover>
-                <PopoverTrigger
-                  aria-label="Open account menu"
-                  className="shrink-0 rounded-full outline-none ring-offset-2 ring-offset-deep-sage transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/70"
-                >
-                  <Avatar className="h-11 w-11 ring-2 ring-white/30">
-                    {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                    <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                </PopoverTrigger>
-                <PopoverContent align="start" sideOffset={8} className="w-72 p-0">
-                  <div className="flex items-center gap-3 border-b border-border p-4">
-                    <Avatar className="h-12 w-12">
-                      {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                      <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold text-foreground">
-                        {fullName}
-                      </div>
-                      {session?.user?.email && (
-                        <div className="truncate text-xs text-muted-foreground">
-                          {session.user.email}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1 p-2 text-sm">
-                    <div className="flex items-center justify-between rounded-md px-3 py-2 text-muted-foreground">
-                      <span>Signed in with</span>
-                      <span className="font-medium text-foreground">
-                        {hasGoogle && hasEmail
-                          ? "Google + Email"
-                          : hasGoogle
-                            ? "Google"
-                            : hasEmail
-                              ? "Email"
-                              : "—"}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => navigate("/onboarding")}
-                      className="w-full rounded-md px-3 py-2 text-left hover:bg-muted"
-                    >
-                      Edit fabric profile
-                    </button>
-                    {hasEmail && !hasGoogle && (
-                      <button
-                        onClick={handleLinkGoogle}
-                        className="w-full rounded-md px-3 py-2 text-left hover:bg-muted"
-                      >
-                        Link Google account
-                      </button>
-                    )}
-                    <button
-                      onClick={handleLogout}
-                      className="w-full rounded-md px-3 py-2 text-left font-medium text-warning-red hover:bg-muted"
-                    >
-                      Sign out
-                    </button>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            )}
-            {isLoading ? (
-              <Skeleton className="h-7 w-40 bg-white/20 sm:w-56" />
-            ) : (
-              <p className="min-w-0 flex-1 truncate font-display text-2xl uppercase sm:text-3xl md:text-4xl">
-                <span className="whitespace-nowrap">Good morning </span>
-                <span className="break-words">{displayName}</span>
-                <span className="whitespace-nowrap"> </span>
-              </p>
+  const accountMenu = isLoading ? (
+    <SpecimenSkeletonBlock className="h-11 w-11 rounded-full" />
+  ) : (
+    <Popover>
+      <PopoverTrigger
+        aria-label="Open account menu"
+        className="shrink-0 rounded-full outline-none ring-offset-2 ring-offset-deep-sage transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-white/70"
+      >
+        <Avatar className="h-11 w-11 ring-2 ring-white/30">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+          <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+      </PopoverTrigger>
+      <PopoverContent align="start" sideOffset={8} className="w-72 p-0">
+        <div className="flex items-center gap-3 border-b-2 border-border p-4">
+          <Avatar className="h-12 w-12">
+            {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+            <AvatarFallback className="bg-terracotta/40 text-sm font-bold text-cream">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-foreground">{fullName}</div>
+            {session?.user?.email && (
+              <div className="type-caption truncate">{session.user.email}</div>
             )}
           </div>
-          <div className="flex gap-2.5">
-            <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg">🔔</div>
-            {hasEmail && !hasGoogle && (
-              <button
-                onClick={handleLinkGoogle}
-                aria-label="Link Google account"
-                title="Link Google account"
-                className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg hover:bg-white/30"
-              >
-                🔗
-              </button>
-            )}
+        </div>
+        <div className="space-y-1 p-2 text-sm">
+          <div className="flex items-center justify-between px-3 py-2 text-muted-foreground">
+            <span>Signed in with</span>
+            <span className="font-medium text-foreground">
+              {hasGoogle && hasEmail
+                ? "Google + Email"
+                : hasGoogle
+                  ? "Google"
+                  : hasEmail
+                    ? "Email"
+                    : "—"}
+            </span>
+          </div>
+          <button
+            onClick={() => navigate("/onboarding")}
+            className="w-full px-3 py-2 text-left hover:bg-muted"
+          >
+            Edit fabric profile
+          </button>
+          {hasEmail && !hasGoogle && (
             <button
-              onClick={handleLogout}
-              aria-label="Sign out"
-              title="Sign out"
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-white/20 text-lg hover:bg-white/30"
+              onClick={handleLinkGoogle}
+              className="w-full px-3 py-2 text-left hover:bg-muted"
             >
-              🚪
+              Link Google account
             </button>
-          </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full px-3 py-2 text-left font-medium text-warning-red hover:bg-muted"
+          >
+            Sign out
+          </button>
         </div>
+      </PopoverContent>
+    </Popover>
+  );
 
-        <div className="mx-auto mt-4 w-full max-w-6xl border-2 border-cream/40 p-4 sm:p-5 md:mt-6 md:p-6">
-          <p className="mb-3 text-[9px] font-bold uppercase tracking-[0.24em] text-terracotta">
-            Fig. 01 — Ambient conditions
-          </p>
-        {isLoading ? (
-          <div className="space-y-3">
-            <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
-              <Skeleton className="h-[52px] w-[52px] rounded-2xl bg-white/20" />
-              <div className="space-y-2">
-                <Skeleton className="h-3 w-32 bg-white/20" />
-                <Skeleton className="h-7 w-20 bg-white/20" />
-              </div>
-              <div className="space-y-2">
-                <Skeleton className="h-3 w-16 bg-white/20" />
-                <Skeleton className="h-3 w-16 bg-white/20" />
-                <Skeleton className="h-3 w-16 bg-white/20" />
-              </div>
+  const weatherPlate = (
+    <>
+      <p className="type-label mb-3 text-terracotta">Fig. 01 — Ambient conditions</p>
+      {isLoading ? (
+        <div className="space-y-3">
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
+            <SpecimenSkeletonBlock className="h-[52px] w-[52px] border-2 border-cream/30" />
+            <div className="space-y-2">
+              <SpecimenSkeletonBlock className="h-3 w-32" />
+              <SpecimenSkeletonBlock className="h-7 w-20" />
             </div>
-            <Skeleton className="h-1.5 w-full bg-white/20" />
+            <div className="space-y-2">
+              <SpecimenSkeletonBlock className="h-3 w-16" />
+              <SpecimenSkeletonBlock className="h-3 w-16" />
+              <SpecimenSkeletonBlock className="h-3 w-16" />
+            </div>
           </div>
-        ) : (
+          <SpecimenSkeletonBlock className="h-1.5 w-full" />
+        </div>
+      ) : (
         <>
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3.5">
-            <div className="flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-terracotta/40 text-2xl">
+            <div className="flex h-[52px] w-[52px] items-center justify-center border-2 border-cream/40 bg-terracotta/40 text-2xl">
               ☀️
             </div>
             <div>
-              <div className="text-xs text-[#CCDDCB]">{weather!.location}</div>
-              <div className="text-3xl font-bold leading-tight">{weather!.temperature}°C</div>
+              <div className="type-label text-cream/70">{weather!.location}</div>
+              <div className="type-h1">{weather!.temperature}°C</div>
             </div>
             <div className="space-y-1 text-[11px]">
               <div className="flex items-center gap-1">
                 💧<span className="font-semibold">{humidityLabel(weather!.humidity)}</span>
               </div>
-              <div className="flex items-center gap-1 text-[#AACCAA]">
+              <div className="flex items-center gap-1 text-cream/70">
                 💨<span>{weather!.windSpeed} km/h</span>
               </div>
               <div className="flex items-center gap-1 font-semibold text-terracotta">
@@ -324,131 +275,159 @@ const Dashboard = () => {
             </div>
           </div>
           <div className="mt-3">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-[#AACCAA]">Humidity Index</span>
-              <span className="font-semibold text-terracotta">{fabricAdvice(weather!.humidity)}</span>
+            <div className="flex items-center justify-between">
+              <span className="type-mono text-cream/70">Humidity Index</span>
+              <span className="type-label text-terracotta">{fabricAdvice(weather!.humidity)}</span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/20">
-              <div
-                className="h-full rounded-full bg-terracotta"
-                style={{ width: `${weather!.humidity}%` }}
-              />
+            <div className="mt-1 h-2 border-2 border-cream/40">
+              <div className="h-full bg-terracotta" style={{ width: `${weather!.humidity}%` }} />
             </div>
           </div>
         </>
-        )}
+      )}
+    </>
+  );
+
+  return (
+    <SpecimenGridLayout
+      title={
+        isLoading ? (
+          <SpecimenSkeletonBlock className="h-8 w-56" />
+        ) : (
+          <span className="flex items-center gap-3">
+            {accountMenu}
+            <span className="min-w-0 break-words">Good morning {displayName}</span>
+          </span>
+        )
+      }
+      eyebrow={`Plate 01 · ${today}`}
+      actions={
+        <>
+          {hasEmail && !hasGoogle && (
+            <button
+              onClick={handleLinkGoogle}
+              aria-label="Link Google account"
+              title="Link Google account"
+              className="border-2 border-cream/50 px-3 py-2 text-lg hover:bg-cream/20"
+            >
+              🔗
+            </button>
+          )}
+          <button
+            onClick={handleLogout}
+            aria-label="Sign out"
+            title="Sign out"
+            className="border-2 border-cream/50 px-3 py-2 text-lg hover:bg-cream/20"
+          >
+            🚪
+          </button>
+        </>
+      }
+      mastheadExtra={weatherPlate}
+      contentClassName="grid auto-rows-fr grid-cols-1 items-stretch gap-4 sm:gap-5 lg:grid-cols-2 lg:gap-6"
+    >
+      <div className="flex h-full flex-col border-2 border-deep-sage bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
+        <div className="flex items-center gap-2 border-b-2 border-cream/30 pb-2">
+          <span className="type-mono text-terracotta">02</span>
+          <span className="type-label text-terracotta">Fabric Persona</span>
         </div>
+        <div className="type-h1 mt-3">{hulasLabel}</div>
+        <p className="type-body mt-1 flex-1 text-cream/80">{hulasAdvice}</p>
+        <button onClick={() => navigate("/onboarding")} className="type-label mt-2 text-terracotta">
+          Change profile ›
+        </button>
       </div>
 
-      {/* Content */}
-      <div className="mx-auto grid w-full max-w-6xl auto-rows-fr grid-cols-1 items-stretch gap-4 px-4 pb-56 pt-5 sm:gap-5 sm:px-6 md:gap-5 md:px-8 md:pb-32 lg:grid-cols-2 lg:gap-6 lg:px-10">
-        <div className="flex h-full flex-col border-2 border-deep-sage bg-deep-sage p-4 text-cream sm:p-5 md:p-6">
-          <div className="flex items-center gap-2 border-b-2 border-cream/30 pb-2">
-            <span className="font-mono text-[10px] tracking-[0.2em] text-terracotta">02</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-terracotta">
-              Fabric Persona
-            </span>
-          </div>
-          <div className="mt-3 font-display text-4xl uppercase leading-none">{hulasLabel}</div>
-          <p className="mt-1 flex-1 text-[13px] leading-6 text-[#CCDACC]">{hulasAdvice}</p>
-          <button
-            onClick={() => navigate("/onboarding")}
-            className="mt-2 text-xs text-[#AACCAA]"
-          >
-            Change profile ›
+      <div className="habi-card flex h-full flex-col p-4 sm:p-5 md:p-6 lg:row-span-2">
+        <div className="flex items-center justify-between border-b-2 border-deep-sage pb-2">
+          <h2 className="type-h2 text-deep-sage">Recent Scans</h2>
+          <button onClick={() => navigate("/history")} className="type-label text-sage-green">
+            See all →
           </button>
         </div>
-
-        <div className="habi-card flex h-full flex-col p-4 sm:p-5 md:p-6 lg:row-span-2">
-          <div className="flex items-center justify-between border-b-2 border-deep-sage pb-2">
-            <h2 className="font-display text-3xl uppercase text-deep-sage">Recent Scans</h2>
-            <button
-              onClick={() => navigate("/history")}
-              className="text-[10px] font-bold uppercase tracking-[0.2em] text-sage-green"
-            >
-              See all →
-            </button>
+        {isLoading ? (
+          <div className="mt-3">
+            <SpecimenSkeletonList rows={3} label="Developing plate 02" />
           </div>
-          {isLoading ? (
-            <div className="mt-3 space-y-3">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="flex items-center gap-3">
-                  <Skeleton className="h-11 w-11 rounded-xl" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-2/3" />
-                    <Skeleton className="h-3 w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : scans.length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">
-              No scans yet. Tap “Start Fabric Scan” to add your first item.
-            </p>
-          ) : (
-            <div className="mt-2 divide-y divide-border">
-              {(() => null)()}
-              {scans.map((s) => {
-                const img = scanImages[s.id];
-                const isOffline = s.id.startsWith("offline:");
-                return (
-                  <div
-                    key={s.id}
-                    onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
-                    className="flex cursor-pointer items-center gap-3 py-2.5"
-                  >
-                    {img ? (
-                      <img
-                        src={img}
-                        alt={s.fabricName}
-                        className="h-11 w-11 rounded-xl object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sage-green text-[13px] font-bold text-white">
-                        {s.grade}
-                      </div>
-                    )}
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold text-foreground">
-                        {s.fabricName}
-                        {isOffline && (
-                          <span className="ml-2 rounded-full bg-terracotta/20 px-2 py-0.5 text-[10px] font-semibold text-terracotta">
-                            Offline
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {s.fiberType} · {formatDate(s.scannedAt)}
-                      </div>
+        ) : scans.length === 0 ? (
+          <div className="mt-3">
+            <SpecimenEmpty
+              index="02"
+              title="No fibers catalogued"
+              note="Your five most recent specimens print here. Capture a swatch and Habi-Check files it under the index."
+              action={
+                <button
+                  onClick={() => navigate("/scanner")}
+                  className="border-2 border-deep-sage bg-terracotta px-5 py-3 font-display text-xl uppercase text-deep-sage"
+                  style={{ boxShadow: "var(--shadow-card)" }}
+                >
+                  Start Fabric Scan →
+                </button>
+              }
+            />
+          </div>
+        ) : (
+          <div className="mt-2 divide-y-2 divide-deep-sage/15">
+            {scans.map((s) => {
+              const img = scanImages[s.id];
+              const isOffline = s.id.startsWith("offline:");
+              return (
+                <div
+                  key={s.id}
+                  onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
+                  className="flex cursor-pointer items-center gap-3 py-2.5"
+                >
+                  {img ? (
+                    <img
+                      src={img}
+                      alt={s.fabricName}
+                      className="h-11 w-11 border-2 border-deep-sage object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-11 w-11 items-center justify-center border-2 border-deep-sage bg-sage-green font-display text-lg text-cream">
+                      {s.grade}
                     </div>
-                    <button
-                      onClick={(e) => handleDelete(e, s)}
-                      aria-label={`Delete scan of ${s.fabricName}`}
-                      className="rounded-full px-2 py-1 text-lg text-muted-foreground hover:text-terracotta"
-                    >
-                      🗑️
-                    </button>
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-foreground">
+                      {s.fabricName}
+                      {isOffline && (
+                        <span className="type-mono ml-2 border-2 border-terracotta px-1.5 py-0.5 text-terracotta">
+                          Offline
+                        </span>
+                      )}
+                    </div>
+                    <div className="type-caption">
+                      {s.fiberType} · {formatDate(s.scannedAt)}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+                  <button
+                    onClick={(e) => handleDelete(e, s)}
+                    aria-label={`Delete scan of ${s.fabricName}`}
+                    className="px-2 py-1 text-lg text-muted-foreground hover:text-terracotta"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-        <div className="flex h-full flex-col border-2 border-deep-sage bg-sage-green p-4 text-cream sm:p-5 md:p-6">
-          <div className="flex items-center gap-2 border-b-2 border-cream/40 pb-2">
-            <span className="font-mono text-[10px] tracking-[0.2em]">03</span>
-            <span className="text-[10px] font-bold uppercase tracking-[0.24em]">Field Notes</span>
-          </div>
-          <div className="mt-3 divide-y divide-cream/25 text-[13px]">
-            <p className="py-2">Basahan upcycle trending this week</p>
-            <p className="py-2">Natural fibers reduce landfill by 40%</p>
-            <p className="py-2">Pre-loved linen value up +12% this season</p>
-          </div>
+      <div className="flex h-full flex-col border-2 border-deep-sage bg-sage-green p-4 text-cream sm:p-5 md:p-6">
+        <div className="flex items-center gap-2 border-b-2 border-cream/40 pb-2">
+          <span className="type-mono">03</span>
+          <span className="type-label">Field Notes</span>
+        </div>
+        <div className="type-body mt-3 divide-y-2 divide-cream/25">
+          <p className="py-2">Basahan upcycle trending this week</p>
+          <p className="py-2">Natural fibers reduce landfill by 40%</p>
+          <p className="py-2">Pre-loved linen value up +12% this season</p>
         </div>
       </div>
 
-      {/* Floating scan CTA + persistent bottom navigation */}
+      {/* Floating scan CTA */}
       <div className="pointer-events-none fixed inset-x-0 bottom-16 z-20 px-5">
         <button
           onClick={() => navigate("/scanner")}
@@ -458,9 +437,9 @@ const Dashboard = () => {
           Start Fabric Scan →
         </button>
       </div>
-      <BottomNav />
-    </div>
+    </SpecimenGridLayout>
   );
 };
+
 
 export default Dashboard;
