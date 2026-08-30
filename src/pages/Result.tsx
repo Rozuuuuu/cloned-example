@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { buildFabricResult, getRecentScans, getScanImageUrl } from "@/lib/habi";
 import SecurityIssues from "@/components/SecurityIssues";
+import SpecimenGridLayout from "@/components/SpecimenGridLayout";
 
 const Result = () => {
   const navigate = useNavigate();
@@ -27,125 +28,117 @@ const Result = () => {
     })();
   }, [scanId]);
 
-  // Gradient + grade colors come straight from ResultViewModel.
-  const gradient = isSuccess ? "var(--gradient-success)" : "var(--gradient-fail)";
-  const gradeColor = isSuccess ? "#7BA05B" : "#D84545";
+  const gradeColor = isSuccess ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
 
   return (
-    <div className="min-h-screen text-white" style={{ background: gradient }}>
-      <div className="px-5 pb-10 pt-12">
-        <div className="flex items-center justify-between">
+    <SpecimenGridLayout
+      title={fabric.name}
+      eyebrow={`${fabric.fiberType} · Specimen report`}
+      actions={
+        <>
           <button
             onClick={() => navigate("/dashboard")}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl"
-            aria-label="Home"
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
           >
-            ←
+            ← Index
           </button>
           <button
             onClick={() => navigate("/scanner")}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 text-xl"
-            aria-label="Scan another"
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
           >
-            ⟳
+            ⟳ Rescan
           </button>
-        </div>
-
-        {imageUrl && (
-          <div className="mx-auto mt-4 h-40 w-40 overflow-hidden rounded-3xl border-2 border-white/30">
-            <img src={imageUrl} alt={fabric.name} className="h-full w-full object-cover" />
-          </div>
-        )}
-
-        <div className="mx-auto mt-5 flex h-32 w-32 flex-col items-center justify-center border-2 border-cream bg-cream">
-          <span className="font-display text-[56px] leading-none" style={{ color: gradeColor }}>
-            {fabric.grade}
-          </span>
-          <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-deep-sage">Grade</span>
-        </div>
-
-        <div className="mt-3 text-center">
-          <h1 className="font-display text-4xl uppercase">{fabric.name}</h1>
-          <p className="text-[10px] font-bold uppercase tracking-[0.24em] opacity-80">{fabric.fiberType}</p>
-        </div>
-
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-white p-4 text-foreground">
-            <div className="text-2xl">💨</div>
-            <div className="text-2xl font-bold">{fabric.breathability}%</div>
-            <div className="text-xs opacity-70">Breathability</div>
-          </div>
-          <div className="rounded-2xl bg-white p-4 text-foreground">
-            <div className="text-2xl">🌿</div>
-            <div className="text-2xl font-bold">{fabric.sustainability}%</div>
-            <div className="text-xs opacity-70">Sustainability</div>
+        </>
+      }
+    >
+      <div className="grid gap-0 border-2 border-deep-sage md:grid-cols-12">
+        {/* Plate: image + grade */}
+        <div className="flex items-stretch border-b-2 border-deep-sage md:col-span-5 md:border-b-0 md:border-r-2">
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt={fabric.name}
+              className="h-48 w-1/2 border-r-2 border-deep-sage object-cover md:h-full"
+            />
+          )}
+          <div className="flex flex-1 flex-col items-center justify-center bg-card p-6">
+            <span className="font-display text-[56px] leading-none" style={{ color: gradeColor }}>
+              {fabric.grade}
+            </span>
+            <span className="type-label text-sage-green">Grade</span>
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl bg-white p-4 text-foreground">
-          <div className="flex gap-3">
-            <span className="text-2xl">💧</span>
-            <div>
-              <div className="font-semibold">Fabric Analysis</div>
-              <p className="mt-1 text-[13px] leading-relaxed">{fabric.personalMessage}</p>
-            </div>
+        {/* Metrics */}
+        <div className="grid grid-cols-2 md:col-span-7">
+          <div className="border-r-2 border-deep-sage bg-card p-5">
+            <div className="type-mono text-sage-green">01 · Breathability</div>
+            <div className="type-h1 text-deep-sage">{fabric.breathability}%</div>
+          </div>
+          <div className="bg-card p-5">
+            <div className="type-mono text-sage-green">02 · Sustainability</div>
+            <div className="type-h1 text-deep-sage">{fabric.sustainability}%</div>
+          </div>
+          <div className="col-span-2 border-t-2 border-deep-sage bg-card p-5">
+            <div className="type-mono text-sage-green">Fabric analysis</div>
+            <p className="type-body mt-1 text-deep-sage">{fabric.personalMessage}</p>
           </div>
         </div>
-
-        {fabric.climateAlert && (
-          <div className="mt-3 rounded-2xl bg-white/15 p-4 text-sm">
-            <div className="font-semibold">⚠️ Climate alert</div>
-            <p className="mt-1 text-[13px] leading-relaxed opacity-90">{fabric.climateAlert}</p>
-          </div>
-        )}
-
-        <div className="mt-3 grid grid-cols-3 gap-2.5">
-          {[
-            { emoji: "✨", label: "Wash Tips" },
-            { emoji: "💰", label: "Resale" },
-            { emoji: "♻️", label: "Upcycle" },
-          ].map((c) => (
-            <div
-              key={c.label}
-              className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 text-foreground"
-            >
-              <span className="text-3xl">{c.emoji}</span>
-              <span className="text-[11px] font-semibold">{c.label}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-4 rounded-2xl bg-white p-4 text-foreground">
-          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Resale Value
-          </div>
-          <div className="mt-1 text-lg font-bold">{fabric.resaleValue}</div>
-          <div className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Upcycling Idea
-          </div>
-          <p className="mt-1 text-sm">{fabric.upcyclingIdea}</p>
-          <div className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Wash Tips
-          </div>
-          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
-            {fabric.washTips.map((t) => (
-              <li key={t}>{t}</li>
-            ))}
-          </ul>
-        </div>
-
-        <Button
-          onClick={() => navigate("/scanner")}
-          className="mt-6 h-14 w-full rounded-full bg-white text-base font-bold text-[#222] hover:bg-white/90"
-          style={{ boxShadow: "0 6px 14px rgba(0,0,0,0.2)" }}
-        >
-          Scan Another Item
-        </Button>
-
-        <SecurityIssues scanId={scanId} />
       </div>
-    </div>
+
+      {fabric.climateAlert && (
+        <div className="mt-5 border-2 border-warning-red bg-warning-red/5 p-5">
+          <div className="type-h3 text-warning-red">Climate alert</div>
+          <p className="type-body mt-1 text-deep-sage">{fabric.climateAlert}</p>
+        </div>
+      )}
+
+      <div className="mt-5 grid gap-0 border-2 border-deep-sage sm:grid-cols-3">
+        {[
+          { n: "03", label: "Wash Tips" },
+          { n: "04", label: "Resale" },
+          { n: "05", label: "Upcycle" },
+        ].map((c) => (
+          <div
+            key={c.label}
+            className="border-b-2 border-deep-sage bg-card p-4 last:border-b-0 sm:border-b-0 sm:border-r-2 sm:last:border-r-0"
+          >
+            <div className="type-mono text-sage-green">{c.n}</div>
+            <div className="type-h3 text-deep-sage">{c.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 border-2 border-deep-sage bg-card p-5" style={{ boxShadow: "var(--shadow-card)" }}>
+        <div className="type-mono text-sage-green">Resale value</div>
+        <div className="type-h2 text-deep-sage">{fabric.resaleValue}</div>
+
+        <div className="type-mono mt-4 border-t-2 border-deep-sage/20 pt-4 text-sage-green">
+          Upcycling idea
+        </div>
+        <p className="type-body text-deep-sage">{fabric.upcyclingIdea}</p>
+
+        <div className="type-mono mt-4 border-t-2 border-deep-sage/20 pt-4 text-sage-green">
+          Wash tips
+        </div>
+        <ul className="type-body list-disc space-y-0.5 pl-5 text-deep-sage">
+          {fabric.washTips.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      </div>
+
+      <Button
+        onClick={() => navigate("/scanner")}
+        className="type-h3 mt-6 h-auto w-full border-2 border-deep-sage bg-deep-sage py-4 text-cream hover:bg-sage-green"
+      >
+        Scan another item →
+      </Button>
+
+      <SecurityIssues scanId={scanId} />
+    </SpecimenGridLayout>
   );
 };
 
 export default Result;
+

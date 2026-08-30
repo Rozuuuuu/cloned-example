@@ -8,7 +8,8 @@ import {
   syncOfflineScans,
   type ScanRecord,
 } from "@/lib/habi";
-import BottomNav from "@/components/BottomNav";
+import SpecimenGridLayout from "@/components/SpecimenGridLayout";
+import { SpecimenEmpty, SpecimenSkeletonList } from "@/components/SpecimenStates";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -207,141 +208,139 @@ const History = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream pb-28">
-      <header className="border-b-2 border-deep-sage bg-deep-sage px-5 pb-6 pt-12 text-cream">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="font-display text-4xl uppercase">Scan History</h1>
-            <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.22em] text-terracotta">
-              All your fabric scans, newest first.
-            </p>
-          </div>
-          {scans.length > 0 && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => exportScans("csv")}
-                className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-cream hover:bg-white/25"
-                aria-label="Export scans as CSV"
-              >
-                ⬇ CSV
-              </button>
-              <button
-                onClick={() => exportScans("json")}
-                className="rounded-full bg-white/15 px-3 py-1.5 text-xs font-semibold text-cream hover:bg-white/25"
-                aria-label="Export scans as JSON"
-              >
-                ⬇ JSON
-              </button>
-            </div>
-          )}
-        </div>
+    <SpecimenGridLayout
+      title="Scan History"
+      eyebrow="All your fabric scans, newest first."
+      actions={
+        scans.length > 0 ? (
+          <>
+            <button
+              onClick={() => exportScans("csv")}
+              className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
+              aria-label="Export scans as CSV"
+            >
+              ↓ CSV
+            </button>
+            <button
+              onClick={() => exportScans("json")}
+              className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
+              aria-label="Export scans as JSON"
+            >
+              ↓ JSON
+            </button>
+          </>
+        ) : undefined
+      }
+      mastheadExtra={
         <div
           aria-label="Keyboard shortcuts"
-          className="mt-3 flex flex-wrap items-center gap-1.5 text-[10px] text-[#AACCAA]"
+          className="flex flex-wrap items-center gap-2 text-cream"
         >
-          <span className="opacity-80">Shortcuts:</span>
-          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">N</kbd>
-          <span>/</span>
-          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">S</kbd>
-          <span className="opacity-80">new scan</span>
-          <span className="opacity-50">·</span>
-          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">Enter</kbd>
-          <span className="opacity-80">confirm delete</span>
-          <span className="opacity-50">·</span>
-          <kbd className="rounded bg-white/15 px-1.5 py-0.5 font-mono text-[10px] text-cream">Esc</kbd>
-          <span className="opacity-80">cancel</span>
+          <span className="type-mono text-terracotta">Shortcuts</span>
+          <kbd className="type-mono border-2 border-cream/50 px-1.5">N</kbd>
+          <kbd className="type-mono border-2 border-cream/50 px-1.5">S</kbd>
+          <span className="type-label">new scan</span>
+          <span className="opacity-40">·</span>
+          <kbd className="type-mono border-2 border-cream/50 px-1.5">Enter</kbd>
+          <span className="type-label">confirm delete</span>
+          <span className="opacity-40">·</span>
+          <kbd className="type-mono border-2 border-cream/50 px-1.5">Esc</kbd>
+          <span className="type-label">cancel</span>
         </div>
-      </header>
-
-      <div className="px-5 pt-5">
-        {!loading && scans.length > 0 && (
-          <div className="mb-4 space-y-3">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by name, fiber, or grade…"
-              className="rounded-full border-deep-sage/20 bg-white"
-            />
-            <div className="flex flex-wrap gap-2">
-              {["all", ...grades].map((g) => (
-                <button
-                  key={g}
-                  onClick={() => setGradeFilter(g)}
-                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                    gradeFilter === g
-                      ? "bg-deep-sage text-cream"
-                      : "bg-white text-deep-sage border border-deep-sage/20"
-                  }`}
-                >
-                  {g === "all" ? "All grades" : `Grade ${g}`}
-                </button>
-              ))}
-            </div>
+      }
+    >
+      {!loading && scans.length > 0 && (
+        <div className="mb-5 space-y-3 border-2 border-deep-sage bg-card p-4">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name, fiber, or grade…"
+            className="border-2 border-deep-sage bg-transparent"
+          />
+          <div className="flex flex-wrap gap-0">
+            {["all", ...grades].map((g) => (
+              <button
+                key={g}
+                onClick={() => setGradeFilter(g)}
+                className={`type-label -ml-[2px] border-2 border-deep-sage px-3 py-2 transition-colors first:ml-0 ${
+                  gradeFilter === g
+                    ? "bg-deep-sage text-cream"
+                    : "bg-transparent text-deep-sage hover:bg-terracotta/25"
+                }`}
+              >
+                {g === "all" ? "All grades" : `Grade ${g}`}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading...</p>
-        ) : scans.length === 0 ? (
-          <div className="habi-card flex flex-col items-center gap-4 py-10 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-sage-green/15 text-4xl">
-              📷
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-deep-sage">No scans yet</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Scan a fabric to see your history here.
-              </p>
-            </div>
+      {loading ? (
+        <SpecimenSkeletonList rows={4} label="Retrieving closet" />
+      ) : scans.length === 0 ? (
+        <SpecimenEmpty
+          index="00"
+          title="No specimens catalogued"
+          note="Scan a fabric and it will be filed here with its grade, fiber and capture date."
+          action={
             <Button
-              onClick={() =>
-                navigate("/scanner", { state: { focusCapture: true } })
-              }
-              className="rounded-full bg-deep-sage px-6 text-cream hover:bg-deep-sage/90"
+              onClick={() => navigate("/scanner", { state: { focusCapture: true } })}
+              className="type-h3 h-auto border-2 border-deep-sage bg-deep-sage px-6 py-3 text-cream hover:bg-sage-green"
             >
-              Start scanning
+              Start scanning →
             </Button>
+          }
+        />
+      ) : filtered.length === 0 ? (
+        <SpecimenEmpty
+          index="—"
+          title="No match in this drawer"
+          note="No scans match your search or grade filter. Clear the filters to see the full closet."
+        />
+      ) : (
+        <div className="border-2 border-deep-sage bg-card" style={{ boxShadow: "var(--shadow-card)" }}>
+          <div className="flex items-center justify-between border-b-2 border-deep-sage px-4 py-2">
+            <span className="type-mono text-sage-green">Catalogue</span>
+            <span className="type-mono text-sage-green">{filtered.length} entries</span>
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="habi-card text-center">
-            <p className="text-sm text-muted-foreground">No scans match your search.</p>
-          </div>
-        ) : (
-          <div className="habi-card divide-y divide-border">
-            {paged.map((s) => {
+          <div className="divide-y-2 divide-deep-sage/15">
+            {paged.map((s, i) => {
               const img = scanImages[s.id];
               const isOffline = s.id.startsWith("offline:");
               return (
                 <div
                   key={s.id}
                   onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
-                  className="flex cursor-pointer items-center gap-3 py-3"
+                  className="flex cursor-pointer items-center gap-4 px-4 py-4 transition-colors hover:bg-terracotta/10"
                 >
+                  <span className="type-mono w-6 shrink-0 text-sage-green/70">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   {img ? (
                     <img
                       src={img}
                       alt={s.fabricName}
                       loading="lazy"
-                      className="h-12 w-12 rounded-xl object-cover"
+                      className="h-12 w-12 shrink-0 border-2 border-deep-sage object-cover"
                     />
                   ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-sage-green text-sm font-bold text-white">
+                    <div className="type-h3 flex h-12 w-12 shrink-0 items-center justify-center border-2 border-deep-sage bg-sage-green text-cream">
                       {s.grade}
                     </div>
                   )}
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold text-foreground">
+                  <div className="min-w-0 flex-1">
+                    <div className="type-h3 flex flex-wrap items-center gap-2 text-deep-sage">
                       {s.fabricName}
                       {isOffline && (
-                        <span className="ml-2 rounded-full bg-terracotta/20 px-2 py-0.5 text-[10px] font-semibold text-terracotta">
+                        <span className="type-mono border-2 border-terracotta px-1.5 text-terracotta">
                           Offline
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="type-label text-sage-green">
                       {s.fiberType} · Grade {s.grade}
                     </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    <div className="type-mono text-muted-foreground">
                       {formatDate(s.scannedAt)}
                     </div>
                   </div>
@@ -349,9 +348,9 @@ const History = () => {
                     onClick={(e) => handleDelete(e, s)}
                     disabled={deleting}
                     aria-label={`Delete scan of ${s.fabricName}`}
-                    className="rounded-full px-2 py-1 text-lg text-muted-foreground hover:text-terracotta disabled:opacity-40"
+                    className="type-label border-2 border-deep-sage px-2 py-1 text-deep-sage transition-colors hover:bg-warning-red hover:text-cream disabled:opacity-40"
                   >
-                    🗑️
+                    Delete
                   </button>
                 </div>
               );
@@ -359,19 +358,19 @@ const History = () => {
             {hasMore && (
               <div
                 ref={sentinelRef}
-                className="flex items-center justify-center py-4 text-xs text-muted-foreground"
+                className="type-mono flex items-center justify-center py-4 text-sage-green"
               >
                 Loading more…
               </div>
             )}
             {!hasMore && filtered.length > PAGE_SIZE && (
-              <div className="py-3 text-center text-[11px] text-muted-foreground">
+              <div className="type-mono py-3 text-center text-sage-green">
                 End of history · {filtered.length} scans
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <ConfirmDialog
         open={!!pendingDelete}
@@ -389,9 +388,7 @@ const History = () => {
           if (!o) setPendingDelete(null);
         }}
       />
-
-      <BottomNav />
-    </div>
+    </SpecimenGridLayout>
   );
 };
 

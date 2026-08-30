@@ -15,7 +15,12 @@ import {
 } from "@/lib/habi";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import BottomNav from "@/components/BottomNav";
+import SpecimenGridLayout from "@/components/SpecimenGridLayout";
+import {
+  SpecimenEmpty,
+  SpecimenSkeletonBlock,
+  SpecimenSkeletonList,
+} from "@/components/SpecimenStates";
 import { signOutEverywhere, useAuthGuard } from "@/hooks/use-auth-guard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
