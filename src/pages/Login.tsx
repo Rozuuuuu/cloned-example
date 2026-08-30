@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { logAuditEvent } from "@/lib/security";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -105,11 +106,13 @@ const Login = () => {
     <div className="min-h-screen bg-cream p-4 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 border-2 border-deep-sage bg-cream md:grid-cols-12">
         {/* Spine */}
-        <div className="flex items-center justify-center bg-deep-sage py-5 text-cream md:col-span-1 md:border-r-2 md:border-deep-sage">
+        <div className="flex items-center justify-between gap-4 bg-deep-sage px-3 py-5 text-cream md:col-span-1 md:flex-col md:border-r-2 md:border-deep-sage">
           <span className="habi-spine font-display text-xs uppercase tracking-[0.28em]">
             Sustainable Textile Intelligence · Issue 01
           </span>
+          <ThemeToggle inverted />
         </div>
+
 
         {/* Editorial plate */}
         <div className="flex flex-col border-b-2 border-deep-sage md:col-span-7 md:border-b-0 md:border-r-2">
@@ -129,10 +132,12 @@ const Login = () => {
                 </p>
               </div>
               <div className="flex items-end justify-end">
-                <div className="flex h-24 w-24 items-center justify-center border-2 border-deep-sage bg-terracotta text-4xl">
-                  🧵
+                <div className="flex h-24 w-24 flex-col items-center justify-center border-2 border-deep-sage bg-terracotta text-cream">
+                  <span className="font-display text-3xl leading-none">01</span>
+                  <span className="type-mono">Fiber</span>
                 </div>
               </div>
+
             </div>
           </div>
           <div className="mt-auto border-t-2 border-deep-sage bg-sage-green p-6 text-cream">
