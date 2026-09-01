@@ -143,7 +143,22 @@ All colors MUST be HSL.
     letter-spacing: 0.02em;
     font-weight: 400;
   }
+
+  /* Specimen focus: a hard 2px ink rule offset from the element, never a
+     soft glow — visible in both themes and on dark mastheads. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid hsl(var(--terracotta));
+    outline-offset: 2px;
+  }
 }
+
+@layer components {
+  /* Skip link: hidden until focused, then pinned to the top-left plate. */
+  .habi-skip-link {
+    @apply type-label absolute left-2 top-2 z-50 -translate-y-24 border-2 border-cream bg-deep-sage px-3 py-2 text-cream transition-transform focus:translate-y-0;
+  }
+}
+
 
 @layer components {
   /* ---- Typography scale (Bebas Neue display / Barlow body) -------------
