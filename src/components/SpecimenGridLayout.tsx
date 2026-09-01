@@ -38,7 +38,10 @@ export const SpecimenGridLayout = ({
   });
 
   return (
-    <div className="min-h-screen bg-cream" data-specimen-shell>
+    <div className="min-h-dvh bg-cream" data-specimen-shell>
+      <a href="#specimen-main" className="habi-skip-link">
+        Skip to content
+      </a>
       <header
         data-testid="specimen-masthead"
         className="border-b-2 border-deep-sage bg-deep-sage px-4 pb-6 pt-8 text-cream sm:px-6 md:px-8 md:pb-8 lg:px-10"
@@ -55,10 +58,16 @@ export const SpecimenGridLayout = ({
 
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="type-h1 min-w-0 break-words">{title}</h1>
+            <h1 id="specimen-title" className="type-h1 min-w-0 break-words">
+              {title}
+            </h1>
             {eyebrow && <p className="type-label mt-1 text-terracotta">{eyebrow}</p>}
           </div>
-          {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+          {actions && (
+            <div role="group" aria-label="Page actions" className="flex flex-wrap items-center gap-2">
+              {actions}
+            </div>
+          )}
         </div>
 
         {mastheadExtra && (
@@ -69,6 +78,9 @@ export const SpecimenGridLayout = ({
       </header>
 
       <main
+        id="specimen-main"
+        tabIndex={-1}
+        aria-labelledby="specimen-title"
         className={`mx-auto w-full max-w-6xl px-4 pb-40 pt-5 sm:px-6 md:px-8 md:pb-32 lg:px-10 ${contentClassName}`}
       >
         {children}
@@ -77,6 +89,7 @@ export const SpecimenGridLayout = ({
       {withNav && <BottomNav />}
     </div>
   );
+
 };
 
 export default SpecimenGridLayout;

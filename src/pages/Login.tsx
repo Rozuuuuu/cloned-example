@@ -103,7 +103,7 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream p-4 md:p-10">
+    <div className="min-h-dvh bg-cream p-4 md:p-10">
       <div className="mx-auto grid w-full max-w-6xl grid-cols-1 border-2 border-deep-sage bg-cream md:grid-cols-12">
         {/* Spine */}
         <div className="flex items-center justify-between gap-4 bg-deep-sage px-3 py-5 text-cream md:col-span-1 md:flex-col md:border-r-2 md:border-deep-sage">
@@ -149,14 +149,18 @@ const Login = () => {
 
         {/* Access plate */}
         <div className="flex flex-col md:col-span-4">
-          <form onSubmit={handleLogin} className="flex flex-grow flex-col justify-center gap-6 p-8 md:p-10">
+          <form onSubmit={handleLogin} aria-label="Account access" className="flex flex-grow flex-col justify-center gap-6 p-8 md:p-10">
             <h2 className="self-start border-b-4 border-terracotta font-display text-3xl text-deep-sage">
               {mode === "login" ? "Account Access" : "New Contributor"}
             </h2>
 
             <div>
-              <label className="habi-label mb-2 block">Member Identifier</label>
+              <label htmlFor="login-email" className="habi-label mb-2 block">Member Identifier</label>
               <input
+                id="login-email"
+                name="email"
+                autoComplete="email"
+                aria-invalid={Boolean(error) || undefined}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -166,8 +170,12 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="habi-label mb-2 block">Secure Passkey</label>
+              <label htmlFor="login-password" className="habi-label mb-2 block">Secure Passkey</label>
               <input
+                id="login-password"
+                name="password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
+                aria-invalid={Boolean(error) || undefined}
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -176,7 +184,11 @@ const Login = () => {
               />
             </div>
 
-            {error && <p className="text-xs font-semibold text-warning-red">{error}</p>}
+            {error && (
+              <p role="alert" aria-live="polite" className="text-xs font-semibold text-warning-red">
+                {error}
+              </p>
+            )}
 
             <Button
               type="submit"
