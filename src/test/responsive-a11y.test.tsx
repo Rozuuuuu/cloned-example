@@ -97,7 +97,7 @@ describe("Specimen Grid responsiveness", () => {
     renderShell();
     const nav = screen.getByRole("navigation", { name: "Primary" });
     const tabs = within(nav).getAllByRole("button");
-    expect(tabs).toHaveLength(3);
+    expect(tabs).toHaveLength(4);
     for (const t of tabs) expect(t.className).toContain("min-h-11");
   });
 });
@@ -138,10 +138,12 @@ describe("Specimen Grid accessibility", () => {
         <BottomNav />
       </MemoryRouter>
     );
-    const [index, scan, closet] = screen.getAllByRole("button");
+    const [index, scan, catalog, closet] = screen.getAllByRole("button");
     index.focus();
     await user.keyboard("{ArrowRight}");
     expect(scan).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
+    expect(catalog).toHaveFocus();
     await user.keyboard("{ArrowRight}");
     expect(closet).toHaveFocus();
     await user.keyboard("{ArrowRight}");
