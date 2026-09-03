@@ -13,6 +13,7 @@ import Scanner from "./pages/Scanner.tsx";
 import Result from "./pages/Result.tsx";
 import ScanDetail from "./pages/ScanDetail.tsx";
 import History from "./pages/History.tsx";
+import Catalog from "./pages/Catalog.tsx";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/result" element={<Result />} />
           <Route path="/scan/:id" element={<ScanDetail />} />
           <Route path="/history" element={<History />} />
+          <Route path="/catalog" element={<Catalog />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

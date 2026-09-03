@@ -4,7 +4,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 const tabs = [
   { to: "/dashboard", label: "Index", icon: "01", description: "Dashboard index" },
   { to: "/scanner", label: "Scan", icon: "02", description: "Scan a garment" },
-  { to: "/history", label: "Closet", icon: "03", description: "Scan history closet" },
+  { to: "/catalog", label: "Catalog", icon: "03", description: "Specimen catalog" },
+  { to: "/history", label: "Closet", icon: "04", description: "Scan history closet" },
 ];
 
 /** Persistent bottom navigation shown on the main app screens. */

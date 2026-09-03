@@ -392,6 +392,91 @@ export const deleteScan = async (scan: ScanRecord): Promise<boolean> => {
   return !error;
 };
 
+export interface ScanUpdate {
+  fabricName: string;
+  grade: string;
+  fiberType: string;
+  /** New photo to upload; replaces any existing image. */
+  imageFile?: File | Blob | null;
+  /** Set true to drop the current photo without uploading a new one. */
+  removeImage?: boolean;
+}
+
+/** Updates an existing catalogued specimen (row + optional photo swap). */
+export const updateScan = async (
+  scan: ScanRecord,
+  patch: ScanUpdate
+): Promise<ScanRecord | null> => {
+  if (scan.id.startsWith("offline:")) {
+    const localId = scan.id.slice("offline:".length);
+    const q = readOfflineQueue();
+    const idx = q.findIndex((o) => o.localId === localId);
+    if (idx === -1) return null;
+    q[idx] = {
+      ...q[idx],
+      fabricName: patch.fabricName,
+      grade: patch.grade,
+      fiberType: patch.fiberType,
+      imageDataUrl: patch.removeImage
+        ? null
+        : patch.imageFile
+          ? await fileToDataUrl(patch.imageFile)
+          : q[idx].imageDataUrl,
+      imageMime: patch.imageFile
+        ? (patch.imageFile as File).type || "image/jpeg"
+        : q[idx].imageMime,
+    };
+    writeOfflineQueue(q);
+    return getOfflineScans().find((s) => s.id === scan.id) ?? null;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  let imagePath: string | null | undefined = undefined;
+  if (patch.imageFile) {
+    const ext =
+      patch.imageFile instanceof File && patch.imageFile.name.includes(".")
+        ? patch.imageFile.name.split(".").pop()
+        : "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from("scan-images")
+      .upload(path, patch.imageFile, {
+        upsert: false,
+        contentType: (patch.imageFile as File).type || "image/jpeg",
+      });
+    if (!upErr) {
+      imagePath = path;
+      if (scan.imagePath) await supabase.storage.from("scan-images").remove([scan.imagePath]);
+    }
+  } else if (patch.removeImage && scan.imagePath) {
+    await supabase.storage.from("scan-images").remove([scan.imagePath]);
+    imagePath = null;
+  }
+
+  const { data, error } = await supabase
+    .from("scans")
+    .update({
+      fabric_name: patch.fabricName,
+      grade: patch.grade,
+      fiber_type: patch.fiberType,
+      ...(imagePath !== undefined ? { image_path: imagePath } : {}),
+    })
+    .eq("id", scan.id)
+    .select("id,fabric_name,grade,fiber_type,image_path,scanned_at")
+    .single();
+  if (error || !data) return null;
+  return {
+    id: data.id as string,
+    fabricName: data.fabric_name as string,
+    grade: data.grade as string,
+    fiberType: data.fiber_type as string,
+    scannedAt: data.scanned_at as string,
+    imagePath: (data.image_path as string | null) ?? undefined,
+  };
+};
+
 /** Look up a single scan by id (supports offline drafts). */
 export const getScanById = async (id: string): Promise<ScanRecord | null> => {
   if (id.startsWith("offline:")) {
