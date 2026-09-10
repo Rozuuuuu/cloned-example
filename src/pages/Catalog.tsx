@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import SpecimenGridLayout from "@/components/SpecimenGridLayout";
@@ -7,6 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { Input } from "@/components/ui/input";
 import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useScanImages } from "@/hooks/use-scan-images";
+import { PHOTO_HINT, validatePhoto } from "@/lib/image-validation";
 import {
   buildFabricResult,
   deleteScan,
@@ -39,6 +40,8 @@ const emptyForm: FormState = {
   removeImage: false,
 };
 
+const PAGE = 6;
+
 const Catalog = () => {
   const navigate = useNavigate();
   const { session, checked } = useAuthGuard();
@@ -46,11 +49,21 @@ const Catalog = () => {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<ScanRecord | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ScanRecord | null>(null);
   const [deleting, setDeleting] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const nameRef = useRef<HTMLInputElement | null>(null);
+
+  // search / filter / paging
+  const [query, setQuery] = useState("");
+  const [gradeFilter, setGradeFilter] = useState("all");
+  const [minBreath, setMinBreath] = useState(0);
+  const [minSustain, setMinSustain] = useState(0);
+  const [visible, setVisible] = useState(PAGE);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const images = useScanImages(scans);
 
@@ -70,9 +83,46 @@ const Catalog = () => {
   );
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
+  const grades = useMemo(
+    () => Array.from(new Set(scans.map((s) => s.grade.trim().toUpperCase()))).sort(),
+    [scans]
+  );
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return scans.filter((s) => {
+      const m = metricsFor(s.grade);
+      if (q && !`${s.fabricName} ${s.fiberType}`.toLowerCase().includes(q)) return false;
+      if (gradeFilter !== "all" && s.grade.trim().toUpperCase() !== gradeFilter) return false;
+      if (m.breathability < minBreath) return false;
+      if (m.sustainability < minSustain) return false;
+      return true;
+    });
+  }, [scans, query, gradeFilter, minBreath, minSustain]);
+
+  useEffect(() => setVisible(PAGE), [query, gradeFilter, minBreath, minSustain]);
+
+  const rows = filtered.slice(0, visible);
+  const hasMore = visible < filtered.length;
+
+  const loadMore = useCallback(() => setVisible((v) => v + PAGE), []);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => entries[0]?.isIntersecting && loadMore(),
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore, rows.length]);
+
   const resetForm = () => {
     setEditing(null);
     setForm(emptyForm);
+    setPhotoError(null);
+    setFieldErrors({});
     if (fileRef.current) fileRef.current.value = "";
   };
 
@@ -85,9 +135,29 @@ const Catalog = () => {
       file: null,
       removeImage: false,
     });
+    setPhotoError(null);
+    setFieldErrors({});
     if (fileRef.current) fileRef.current.value = "";
     nameRef.current?.focus();
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) {
+      setPhotoError(null);
+      setForm((f) => ({ ...f, file: null }));
+      return;
+    }
+    const error = await validatePhoto(file);
+    if (error) {
+      setPhotoError(error);
+      setForm((f) => ({ ...f, file: null, removeImage: false }));
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setPhotoError(null);
+    setForm((f) => ({ ...f, file, removeImage: false }));
   };
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -96,12 +166,16 @@ const Catalog = () => {
     const fabricName = form.fabricName.trim();
     const grade = form.grade.trim();
     const fiberType = form.fiberType.trim();
-    if (!fabricName || !grade || !fiberType) {
-      toast.error("Name, grade and fiber are required.");
-      return;
-    }
-    if (fabricName.length > 100 || fiberType.length > 120 || grade.length > 4) {
-      toast.error("One of the fields is too long.");
+    const errs: Record<string, string> = {};
+    if (!fabricName) errs.fabricName = "Fabric name is required.";
+    else if (fabricName.length > 100) errs.fabricName = "Keep the name under 100 characters.";
+    if (!grade) errs.grade = "Grade is required.";
+    else if (grade.length > 4) errs.grade = "Grade can be at most 4 characters.";
+    if (!fiberType) errs.fiberType = "Fiber type is required.";
+    else if (fiberType.length > 120) errs.fiberType = "Keep the fiber under 120 characters.";
+    setFieldErrors(errs);
+    if (Object.keys(errs).length || photoError) {
+      toast.error("Fix the highlighted fields first.");
       return;
     }
     setSaving(true);
@@ -155,6 +229,7 @@ const Catalog = () => {
     });
 
   const fieldClass = "border-2 border-deep-sage bg-transparent";
+  const errClass = "type-label mt-1 block text-warning-red";
 
   return (
     <SpecimenGridLayout
@@ -173,6 +248,7 @@ const Catalog = () => {
       <form
         onSubmit={onSubmit}
         data-testid="catalog-form"
+        noValidate
         aria-label={editing ? "Edit specimen" : "Add specimen"}
         className="mb-6 border-2 border-deep-sage bg-card"
         style={{ boxShadow: "var(--shadow-card)" }}
@@ -202,10 +278,17 @@ const Catalog = () => {
               ref={nameRef}
               maxLength={100}
               value={form.fabricName}
+              aria-invalid={!!fieldErrors.fabricName}
+              aria-describedby={fieldErrors.fabricName ? "cat-name-error" : undefined}
               onChange={(e) => setForm((f) => ({ ...f, fabricName: e.target.value }))}
               placeholder="Premium Linen"
               className={fieldClass}
             />
+            {fieldErrors.fabricName && (
+              <span id="cat-name-error" role="alert" className={errClass}>
+                {fieldErrors.fabricName}
+              </span>
+            )}
           </div>
           <div>
             <label htmlFor="cat-grade" className="type-label text-sage-green">
@@ -215,10 +298,17 @@ const Catalog = () => {
               id="cat-grade"
               maxLength={4}
               value={form.grade}
+              aria-invalid={!!fieldErrors.grade}
+              aria-describedby={fieldErrors.grade ? "cat-grade-error" : undefined}
               onChange={(e) => setForm((f) => ({ ...f, grade: e.target.value }))}
               placeholder="A+"
               className={fieldClass}
             />
+            {fieldErrors.grade && (
+              <span id="cat-grade-error" role="alert" className={errClass}>
+                {fieldErrors.grade}
+              </span>
+            )}
           </div>
           <div>
             <label htmlFor="cat-fiber" className="type-label text-sage-green">
@@ -228,10 +318,17 @@ const Catalog = () => {
               id="cat-fiber"
               maxLength={120}
               value={form.fiberType}
+              aria-invalid={!!fieldErrors.fiberType}
+              aria-describedby={fieldErrors.fiberType ? "cat-fiber-error" : undefined}
               onChange={(e) => setForm((f) => ({ ...f, fiberType: e.target.value }))}
               placeholder="100% Natural Linen"
               className={fieldClass}
             />
+            {fieldErrors.fiberType && (
+              <span id="cat-fiber-error" role="alert" className={errClass}>
+                {fieldErrors.fiberType}
+              </span>
+            )}
           </div>
 
           <div className="md:col-span-2">
@@ -242,13 +339,25 @@ const Catalog = () => {
               id="cat-photo"
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/avif"
               data-testid="catalog-photo"
-              onChange={(e) =>
-                setForm((f) => ({ ...f, file: e.target.files?.[0] ?? null, removeImage: false }))
-              }
+              aria-invalid={!!photoError}
+              aria-describedby="cat-photo-hint"
+              onChange={onPickPhoto}
               className="type-body block w-full border-2 border-deep-sage bg-transparent p-2 text-deep-sage file:mr-3 file:border-2 file:border-deep-sage file:bg-deep-sage file:px-3 file:py-1 file:text-cream"
             />
+            <span id="cat-photo-hint" className="type-label mt-1 block text-sage-green">
+              {PHOTO_HINT}
+            </span>
+            {photoError && (
+              <span
+                data-testid="catalog-photo-error"
+                role="alert"
+                className={errClass}
+              >
+                {photoError}
+              </span>
+            )}
             {editing && editing.imagePath && !form.file && (
               <label className="type-label mt-2 flex items-center gap-2 text-sage-green">
                 <input
@@ -281,6 +390,92 @@ const Catalog = () => {
         </div>
       </form>
 
+      {/* Finder plate — search & filters */}
+      <section
+        aria-label="Search and filter specimens"
+        className="mb-6 grid gap-4 border-2 border-deep-sage bg-card p-4 md:grid-cols-4"
+        style={{ boxShadow: "var(--shadow-card)" }}
+      >
+        <div className="md:col-span-2">
+          <label htmlFor="cat-search" className="type-label text-sage-green">
+            Search name or fiber
+          </label>
+          <Input
+            id="cat-search"
+            type="search"
+            data-testid="catalog-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Linen, cotton…"
+            className={fieldClass}
+          />
+        </div>
+        <div>
+          <label htmlFor="cat-grade-filter" className="type-label text-sage-green">
+            Grade
+          </label>
+          <select
+            id="cat-grade-filter"
+            data-testid="catalog-grade-filter"
+            value={gradeFilter}
+            onChange={(e) => setGradeFilter(e.target.value)}
+            className="type-body block h-10 w-full border-2 border-deep-sage bg-transparent px-2 text-deep-sage"
+          >
+            <option value="all">All grades</option>
+            {grades.map((g) => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label htmlFor="cat-min-breath" className="type-label text-sage-green">
+              Min breath.
+            </label>
+            <Input
+              id="cat-min-breath"
+              type="number"
+              min={0}
+              max={100}
+              value={minBreath}
+              onChange={(e) => setMinBreath(Number(e.target.value) || 0)}
+              className={fieldClass}
+            />
+          </div>
+          <div>
+            <label htmlFor="cat-min-sustain" className="type-label text-sage-green">
+              Min sustain.
+            </label>
+            <Input
+              id="cat-min-sustain"
+              type="number"
+              min={0}
+              max={100}
+              value={minSustain}
+              onChange={(e) => setMinSustain(Number(e.target.value) || 0)}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+        <div className="md:col-span-4 flex items-center justify-between border-t-2 border-deep-sage pt-3">
+          <span className="type-mono text-sage-green" data-testid="catalog-count">
+            Showing {rows.length} of {filtered.length} filtered · {scans.length} on file
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setGradeFilter("all");
+              setMinBreath(0);
+              setMinSustain(0);
+            }}
+            className="type-label border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-terracotta/25"
+          >
+            Reset filters
+          </button>
+        </div>
+      </section>
+
       {/* Catalogued rows — Result-page layout per entry */}
       {loading || !checked ? (
         <SpecimenSkeletonList rows={3} label="Reading catalog" />
@@ -290,9 +485,15 @@ const Catalog = () => {
           title="Catalog is empty"
           note="Add a specimen above — name, grade, fiber and a photo — and it appears here, in your closet, and in every export."
         />
+      ) : filtered.length === 0 ? (
+        <SpecimenEmpty
+          index="04"
+          title="No specimens match"
+          note="Nothing on file matches this search and filter set. Widen the metrics or reset the filters to see the full catalog again."
+        />
       ) : (
         <div className="space-y-5">
-          {scans.map((s, i) => {
+          {rows.map((s, i) => {
             const img = images[s.id];
             const m = metricsFor(s.grade);
             const good = /^[ABC]/i.test(s.grade.trim());
@@ -369,6 +570,18 @@ const Catalog = () => {
               </article>
             );
           })}
+
+          <div ref={sentinelRef} aria-hidden="true" />
+          {hasMore && (
+            <button
+              type="button"
+              onClick={loadMore}
+              data-testid="catalog-load-more"
+              className="type-label w-full border-2 border-deep-sage px-3 py-3 text-deep-sage transition-colors hover:bg-terracotta/25"
+            >
+              Load {Math.min(PAGE, filtered.length - visible)} more →
+            </button>
+          )}
         </div>
       )}
 
@@ -377,7 +590,7 @@ const Catalog = () => {
         title="Delete this specimen?"
         description={
           pendingDelete
-            ? `“${pendingDelete.fabricName}” will be removed from the catalog, history and exports.`
+            ? `“${pendingDelete.fabricName}” will be removed from the catalog, history and exports. This cannot be undone.`
             : undefined
         }
         confirmLabel={deleting ? "Deleting…" : "Delete"}
