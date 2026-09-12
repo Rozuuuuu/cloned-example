@@ -85,6 +85,28 @@ def row_by_name(page, name: str):
     return page.get_by_test_id("catalog-row").filter(has_text=name)
 
 
+async def wait_for_row(page, name: str, present: bool = True, timeout: int = 15000) -> bool:
+    """Poll until the named row appears (or disappears) — the list refetches async."""
+    try:
+        await row_by_name(page, name).first.wait_for(
+            state="visible" if present else "detached", timeout=timeout
+        )
+        return present
+    except Exception:  # noqa: BLE001
+        return await row_by_name(page, name).count() == (1 if present else 0)
+
+
+async def wait_for_text(page, needle: str, timeout: int = 15000) -> bool:
+    """Case-insensitive poll of <main> text (styles uppercase the copy)."""
+    deadline = timeout
+    while deadline > 0:
+        if needle.lower() in (await page.inner_text("main")).lower():
+            return True
+        await page.wait_for_timeout(500)
+        deadline -= 500
+    return False
+
+
 async def main() -> None:
     os.makedirs(SHOTS, exist_ok=True)
     os.makedirs(TMP, exist_ok=True)
@@ -119,13 +141,13 @@ async def main() -> None:
         await page.set_input_files("#cat-photo", tiny)
         await page.wait_for_timeout(400)
         text = (await err.inner_text()) if await err.count() else ""
-        check("200 px" in text, f"photo: undersized image rejected inline ({text[:60]})")
+        check("200 px" in text.lower(), f"photo: undersized image rejected inline ({text[:60]})")
 
         # --- add ----------------------------------------------------------
         before = await page.get_by_test_id("catalog-row").count()
         await add_specimen(page, NAME, "A+", "100% Smoke Linen", good)
         check(await err.count() == 0, "photo: valid upload clears the inline error")
-        check(await row_by_name(page, NAME).count() == 1, "add: new specimen row rendered")
+        check(await wait_for_row(page, NAME), "add: new specimen row rendered")
         check(
             await page.get_by_test_id("catalog-row").count() == before + 1,
             "add: row count increased by one",
@@ -161,17 +183,15 @@ async def main() -> None:
         await page.wait_for_timeout(400)
         await page.fill("#cat-name", NAME2)
         await page.get_by_test_id("catalog-submit").click()
-        await page.wait_for_timeout(1500)
-        check(await row_by_name(page, NAME2).count() == 1, "edit: row shows the new name")
+        check(await wait_for_row(page, NAME2), "edit: row shows the new name")
 
         # --- History ------------------------------------------------------------
         await page.goto(f"{BASE}/history", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1500)
-        check(NAME2 in await page.inner_text("main"), "history: catalog row appears in the closet")
+        check(await wait_for_text(page, NAME2), "history: catalog row appears in the closet")
         await page.screenshot(path=f"{SHOTS}/history.png")
 
         # --- export -------------------------------------------------------------
-        export = page.get_by_role("button", name="Export CSV")
+        export = page.get_by_label("Export scans as CSV")
         if await export.count():
             try:
                 async with page.expect_download(timeout=15000) as dl:
@@ -186,7 +206,7 @@ async def main() -> None:
 
         # --- delete (cancel then confirm) -----------------------------------------
         await page.goto(f"{BASE}/catalog", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1200)
+        await wait_for_row(page, NAME2)
         await page.get_by_role("button", name=f"Delete {NAME2}").click()
         await page.wait_for_timeout(300)
         check(await page.get_by_role("alertdialog").count() == 1, "delete: confirmation dialog opens")
@@ -197,13 +217,16 @@ async def main() -> None:
         await page.get_by_role("button", name=f"Delete {NAME2}").click()
         await page.wait_for_timeout(300)
         await page.get_by_role("button", name="Delete", exact=True).click()
-        await page.wait_for_timeout(2000)
+        await page.wait_for_timeout(2500)
         check(await row_by_name(page, NAME2).count() == 0, "delete: confirm removes the specimen")
         await page.screenshot(path=f"{SHOTS}/after-delete.png")
 
         await page.goto(f"{BASE}/history", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1500)
-        check(NAME2 not in await page.inner_text("main"), "history: deleted row is gone")
+        await page.wait_for_timeout(2000)
+        check(
+            NAME2.lower() not in (await page.inner_text("main")).lower(),
+            "history: deleted row is gone",
+        )
 
         check(not errors, f"no uncaught page errors ({errors[:1]})")
         await browser.close()
