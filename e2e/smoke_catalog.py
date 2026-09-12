@@ -183,17 +183,15 @@ async def main() -> None:
         await page.wait_for_timeout(400)
         await page.fill("#cat-name", NAME2)
         await page.get_by_test_id("catalog-submit").click()
-        await page.wait_for_timeout(1500)
-        check(await row_by_name(page, NAME2).count() == 1, "edit: row shows the new name")
+        check(await wait_for_row(page, NAME2), "edit: row shows the new name")
 
         # --- History ------------------------------------------------------------
         await page.goto(f"{BASE}/history", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1500)
-        check(NAME2 in await page.inner_text("main"), "history: catalog row appears in the closet")
+        check(await wait_for_text(page, NAME2), "history: catalog row appears in the closet")
         await page.screenshot(path=f"{SHOTS}/history.png")
 
         # --- export -------------------------------------------------------------
-        export = page.get_by_role("button", name="Export CSV")
+        export = page.get_by_label("Export scans as CSV")
         if await export.count():
             try:
                 async with page.expect_download(timeout=15000) as dl:
