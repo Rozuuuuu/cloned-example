@@ -141,7 +141,7 @@ async def main() -> None:
         await page.set_input_files("#cat-photo", tiny)
         await page.wait_for_timeout(400)
         text = (await err.inner_text()) if await err.count() else ""
-        check("200 px" in text, f"photo: undersized image rejected inline ({text[:60]})")
+        check("200 px" in text.lower(), f"photo: undersized image rejected inline ({text[:60]})")
 
         # --- add ----------------------------------------------------------
         before = await page.get_by_test_id("catalog-row").count()
