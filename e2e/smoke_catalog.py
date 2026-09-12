@@ -147,7 +147,7 @@ async def main() -> None:
         before = await page.get_by_test_id("catalog-row").count()
         await add_specimen(page, NAME, "A+", "100% Smoke Linen", good)
         check(await err.count() == 0, "photo: valid upload clears the inline error")
-        check(await row_by_name(page, NAME).count() == 1, "add: new specimen row rendered")
+        check(await wait_for_row(page, NAME), "add: new specimen row rendered")
         check(
             await page.get_by_test_id("catalog-row").count() == before + 1,
             "add: row count increased by one",
