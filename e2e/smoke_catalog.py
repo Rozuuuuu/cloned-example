@@ -206,7 +206,7 @@ async def main() -> None:
 
         # --- delete (cancel then confirm) -----------------------------------------
         await page.goto(f"{BASE}/catalog", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1200)
+        await wait_for_row(page, NAME2)
         await page.get_by_role("button", name=f"Delete {NAME2}").click()
         await page.wait_for_timeout(300)
         check(await page.get_by_role("alertdialog").count() == 1, "delete: confirmation dialog opens")
