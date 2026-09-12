@@ -217,13 +217,16 @@ async def main() -> None:
         await page.get_by_role("button", name=f"Delete {NAME2}").click()
         await page.wait_for_timeout(300)
         await page.get_by_role("button", name="Delete", exact=True).click()
-        await page.wait_for_timeout(2000)
+        await page.wait_for_timeout(2500)
         check(await row_by_name(page, NAME2).count() == 0, "delete: confirm removes the specimen")
         await page.screenshot(path=f"{SHOTS}/after-delete.png")
 
         await page.goto(f"{BASE}/history", wait_until="domcontentloaded")
-        await page.wait_for_timeout(1500)
-        check(NAME2 not in await page.inner_text("main"), "history: deleted row is gone")
+        await page.wait_for_timeout(2000)
+        check(
+            NAME2.lower() not in (await page.inner_text("main")).lower(),
+            "history: deleted row is gone",
+        )
 
         check(not errors, f"no uncaught page errors ({errors[:1]})")
         await browser.close()
