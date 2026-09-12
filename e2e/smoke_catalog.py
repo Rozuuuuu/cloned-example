@@ -85,6 +85,28 @@ def row_by_name(page, name: str):
     return page.get_by_test_id("catalog-row").filter(has_text=name)
 
 
+async def wait_for_row(page, name: str, present: bool = True, timeout: int = 15000) -> bool:
+    """Poll until the named row appears (or disappears) — the list refetches async."""
+    try:
+        await row_by_name(page, name).first.wait_for(
+            state="visible" if present else "detached", timeout=timeout
+        )
+        return present
+    except Exception:  # noqa: BLE001
+        return await row_by_name(page, name).count() == (1 if present else 0)
+
+
+async def wait_for_text(page, needle: str, timeout: int = 15000) -> bool:
+    """Case-insensitive poll of <main> text (styles uppercase the copy)."""
+    deadline = timeout
+    while deadline > 0:
+        if needle.lower() in (await page.inner_text("main")).lower():
+            return True
+        await page.wait_for_timeout(500)
+        deadline -= 500
+    return False
+
+
 async def main() -> None:
     os.makedirs(SHOTS, exist_ok=True)
     os.makedirs(TMP, exist_ok=True)
