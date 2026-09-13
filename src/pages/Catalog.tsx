@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import SpecimenGridLayout from "@/components/SpecimenGridLayout";
+import CatalogRowPlate from "@/components/CatalogRowPlate";
+import { metricsFor } from "@/lib/catalog";
+import { downloadText, toSpecimensCsv, toSpecimensPdf } from "@/lib/catalog-export";
 import { SpecimenEmpty, SpecimenSkeletonList } from "@/components/SpecimenStates";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { Input } from "@/components/ui/input";
@@ -9,20 +12,12 @@ import { useAuthGuard } from "@/hooks/use-auth-guard";
 import { useScanImages } from "@/hooks/use-scan-images";
 import { PHOTO_HINT, validatePhoto } from "@/lib/image-validation";
 import {
-  buildFabricResult,
   deleteScan,
   getRecentScans,
   saveScan,
   updateScan,
   type ScanRecord,
 } from "@/lib/habi";
-
-/** Grade → the same metric set the Result page prints, so rows stay identical. */
-const metricsFor = (grade: string) => {
-  const good = /^[ABC]/i.test(grade.trim());
-  const base = buildFabricResult(good ? "success" : "fail");
-  return { breathability: base.breathability, sustainability: base.sustainability };
-};
 
 type FormState = {
   fabricName: string;
@@ -236,12 +231,36 @@ const Catalog = () => {
       title="Specimen Catalog"
       eyebrow={`Plate 04 · ${scans.length} entries on file`}
       actions={
-        <button
-          onClick={() => navigate("/history")}
-          className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
-        >
-          Closet →
-        </button>
+        <>
+          <button
+            onClick={exportCsv}
+            disabled={exporting !== false || filtered.length === 0}
+            data-testid="catalog-export-csv"
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
+          >
+            {exporting === "csv" ? "Exporting…" : "Export CSV"}
+          </button>
+          <button
+            onClick={exportPdf}
+            disabled={exporting !== false || filtered.length === 0}
+            data-testid="catalog-export-pdf"
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
+          >
+            {exporting === "pdf" ? "Exporting…" : "Export PDF"}
+          </button>
+          <button
+            onClick={() => navigate("/catalog/stats")}
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
+          >
+            Dashboard →
+          </button>
+          <button
+            onClick={() => navigate("/history")}
+            className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
+          >
+            Closet →
+          </button>
+        </>
       }
     >
       {/* Entry plate — add / edit */}
@@ -493,83 +512,39 @@ const Catalog = () => {
         />
       ) : (
         <div className="space-y-5">
-          {rows.map((s, i) => {
-            const img = images[s.id];
-            const m = metricsFor(s.grade);
-            const good = /^[ABC]/i.test(s.grade.trim());
-            const gradeColor = good ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
-            return (
-              <article
-                key={s.id}
-                data-testid="catalog-row"
-                className="grid gap-0 border-2 border-deep-sage md:grid-cols-12"
-                style={{ boxShadow: "var(--shadow-card)" }}
-              >
-                <div className="flex items-stretch border-b-2 border-deep-sage md:col-span-5 md:border-b-0 md:border-r-2">
-                  {img && (
-                    <img
-                      src={img}
-                      alt={s.fabricName}
-                      loading="lazy"
-                      className="h-40 w-1/2 border-r-2 border-deep-sage object-cover md:h-full"
-                    />
-                  )}
-                  <div className="flex flex-1 flex-col items-center justify-center bg-card p-6">
-                    <span
-                      className="font-display text-[48px] leading-none"
-                      style={{ color: gradeColor }}
-                    >
-                      {s.grade}
-                    </span>
-                    <span className="type-label text-sage-green">Grade</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:col-span-7">
-                  <div className="col-span-2 border-b-2 border-deep-sage bg-card p-4">
-                    <div className="type-mono text-sage-green">
-                      {String(i + 1).padStart(2, "0")} · Specimen
-                    </div>
-                    <div className="type-h2 text-deep-sage">{s.fabricName}</div>
-                    <div className="type-label text-sage-green">
-                      {s.fiberType} · {formatDate(s.scannedAt)}
-                    </div>
-                  </div>
-                  <div className="border-r-2 border-deep-sage bg-card p-4">
-                    <div className="type-mono text-sage-green">Breathability</div>
-                    <div className="type-h1 text-deep-sage">{m.breathability}%</div>
-                  </div>
-                  <div className="bg-card p-4">
-                    <div className="type-mono text-sage-green">Sustainability</div>
-                    <div className="type-h1 text-deep-sage">{m.sustainability}%</div>
-                  </div>
-                  <div className="col-span-2 flex flex-wrap gap-0 border-t-2 border-deep-sage bg-card p-4">
-                    <button
-                      onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
-                      className="type-label border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-terracotta/25"
-                    >
-                      View report
-                    </button>
-                    <button
-                      onClick={() => startEdit(s)}
-                      aria-label={`Edit ${s.fabricName}`}
-                      className="type-label -ml-[2px] border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-terracotta/25"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setPendingDelete(s)}
-                      disabled={deleting}
-                      aria-label={`Delete ${s.fabricName}`}
-                      className="type-label -ml-[2px] border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-warning-red hover:text-cream disabled:opacity-40"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+          {rows.map((s, i) => (
+            <CatalogRowPlate
+              key={s.id}
+              scan={s}
+              image={images[s.id]}
+              index={String(i + 1).padStart(2, "0")}
+              actions={
+                <>
+                  <button
+                    onClick={() => navigate(`/scan/${encodeURIComponent(s.id)}`)}
+                    className="type-label border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-terracotta/25"
+                  >
+                    View report
+                  </button>
+                  <button
+                    onClick={() => startEdit(s)}
+                    aria-label={`Edit ${s.fabricName}`}
+                    className="type-label -ml-[2px] border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-terracotta/25"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setPendingDelete(s)}
+                    disabled={deleting}
+                    aria-label={`Delete ${s.fabricName}`}
+                    className="type-label -ml-[2px] border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-warning-red hover:text-cream disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                </>
+              }
+            />
+          ))}
 
           <div ref={sentinelRef} aria-hidden="true" />
           {hasMore && (

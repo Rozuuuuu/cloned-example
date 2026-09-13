@@ -14,6 +14,7 @@ import Result from "./pages/Result.tsx";
 import ScanDetail from "./pages/ScanDetail.tsx";
 import History from "./pages/History.tsx";
 import Catalog from "./pages/Catalog.tsx";
+import CatalogDashboard from "./pages/CatalogDashboard.tsx";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
           <Route path="/scan/:id" element={<ScanDetail />} />
           <Route path="/history" element={<History />} />
           <Route path="/catalog" element={<Catalog />} />
+          <Route path="/catalog/stats" element={<CatalogDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
