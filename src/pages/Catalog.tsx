@@ -61,6 +61,8 @@ const Catalog = () => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const images = useScanImages(scans);
+  const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
+
 
   const refresh = async () => {
     setScans(await getRecentScans());
