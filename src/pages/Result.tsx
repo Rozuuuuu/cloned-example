@@ -19,14 +19,17 @@ const Result = () => {
   // Look up the saved scan to render the captured photo (matches ImagePath in repo).
   const scanId = params.get("id");
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [record, setRecord] = useState<ScanRecord | null>(null);
   useEffect(() => {
     if (!scanId) return;
     (async () => {
       const scans = await getRecentScans(10);
       const match = scans.find((s) => s.id === scanId);
+      setRecord(match ?? null);
       setImageUrl(await getScanImageUrl(match?.imagePath));
     })();
   }, [scanId]);
+
 
   const gradeColor = isSuccess ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
 
