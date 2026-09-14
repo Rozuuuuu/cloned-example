@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { buildFabricResult, getRecentScans, getScanImageUrl } from "@/lib/habi";
+import { buildFabricResult, getRecentScans, getScanImageUrl, type ScanRecord } from "@/lib/habi";
 import SecurityIssues from "@/components/SecurityIssues";
 import SpecimenGridLayout from "@/components/SpecimenGridLayout";
+import CatalogRowPlate from "@/components/CatalogRowPlate";
+
 
 const Result = () => {
   const navigate = useNavigate();
@@ -19,14 +21,17 @@ const Result = () => {
   // Look up the saved scan to render the captured photo (matches ImagePath in repo).
   const scanId = params.get("id");
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [record, setRecord] = useState<ScanRecord | null>(null);
   useEffect(() => {
     if (!scanId) return;
     (async () => {
       const scans = await getRecentScans(10);
       const match = scans.find((s) => s.id === scanId);
+      setRecord(match ?? null);
       setImageUrl(await getScanImageUrl(match?.imagePath));
     })();
   }, [scanId]);
+
 
   const gradeColor = isSuccess ? "hsl(var(--sage-green))" : "hsl(var(--warning-red))";
 
@@ -127,6 +132,26 @@ const Result = () => {
           ))}
         </ul>
       </div>
+
+      {record && (
+        <section className="mt-6" aria-label="Catalog entry">
+          <div className="type-mono mb-2 text-sage-green">Catalog entry</div>
+          <CatalogRowPlate
+            scan={record}
+            image={imageUrl}
+            index="01"
+            actions={
+              <button
+                onClick={() => navigate("/catalog")}
+                className="type-label border-2 border-deep-sage px-3 py-2 text-deep-sage transition-colors hover:bg-deep-sage hover:text-cream"
+              >
+                Open catalog →
+              </button>
+            }
+          />
+        </section>
+      )}
+
 
       <Button
         onClick={() => navigate("/scanner")}
