@@ -228,6 +228,34 @@ const Catalog = () => {
   const fieldClass = "border-2 border-deep-sage bg-transparent";
   const errClass = "type-label mt-1 block text-warning-red";
 
+  const exportCsv = () => {
+    if (exporting !== false || filtered.length === 0) return;
+    setExporting("csv");
+    try {
+      downloadText(
+        toSpecimensCsv(filtered, images),
+        `specimen-catalog-${Date.now()}.csv`,
+        "text/csv;charset=utf-8"
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportPdf = async () => {
+    if (exporting !== false || filtered.length === 0) return;
+    setExporting("pdf");
+    try {
+      await toSpecimensPdf(filtered, images, {
+        subtitle: `${filtered.length} specimen(s)`,
+      });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+
+
   return (
     <SpecimenGridLayout
       title="Specimen Catalog"
