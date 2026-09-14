@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { buildFabricResult, getRecentScans, getScanImageUrl } from "@/lib/habi";
+import { buildFabricResult, getRecentScans, getScanImageUrl, type ScanRecord } from "@/lib/habi";
 import SecurityIssues from "@/components/SecurityIssues";
 import SpecimenGridLayout from "@/components/SpecimenGridLayout";
+import CatalogRowPlate from "@/components/CatalogRowPlate";
+
 
 const Result = () => {
   const navigate = useNavigate();
