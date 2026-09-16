@@ -62,6 +62,7 @@ const Catalog = () => {
 
   const images = useScanImages(scans);
   const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
 
   const refresh = async () => {
@@ -228,15 +229,21 @@ const Catalog = () => {
   const fieldClass = "border-2 border-deep-sage bg-transparent";
   const errClass = "type-label mt-1 block text-warning-red";
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (exporting !== false || filtered.length === 0) return;
     setExporting("csv");
+    setExportError(null);
     try {
       downloadText(
         toSpecimensCsv(filtered, images),
         `specimen-catalog-${Date.now()}.csv`,
         "text/csv;charset=utf-8"
       );
+      toast.success(`CSV exported — ${filtered.length} specimen(s)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setExportError(`CSV export failed: ${msg}`);
+      toast.error("CSV export failed", { description: msg });
     } finally {
       setExporting(false);
     }
@@ -245,10 +252,16 @@ const Catalog = () => {
   const exportPdf = async () => {
     if (exporting !== false || filtered.length === 0) return;
     setExporting("pdf");
+    setExportError(null);
     try {
       await toSpecimensPdf(filtered, images, {
         subtitle: `${filtered.length} specimen(s)`,
       });
+      toast.success(`PDF exported — ${filtered.length} specimen(s)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setExportError(`PDF export failed: ${msg}`);
+      toast.error("PDF export failed", { description: msg });
     } finally {
       setExporting(false);
     }
