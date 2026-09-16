@@ -62,6 +62,7 @@ const Catalog = () => {
 
   const images = useScanImages(scans);
   const [exporting, setExporting] = useState<false | "csv" | "pdf">(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
 
   const refresh = async () => {
@@ -228,15 +229,21 @@ const Catalog = () => {
   const fieldClass = "border-2 border-deep-sage bg-transparent";
   const errClass = "type-label mt-1 block text-warning-red";
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     if (exporting !== false || filtered.length === 0) return;
     setExporting("csv");
+    setExportError(null);
     try {
       downloadText(
         toSpecimensCsv(filtered, images),
         `specimen-catalog-${Date.now()}.csv`,
         "text/csv;charset=utf-8"
       );
+      toast.success(`CSV exported — ${filtered.length} specimen(s)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setExportError(`CSV export failed: ${msg}`);
+      toast.error("CSV export failed", { description: msg });
     } finally {
       setExporting(false);
     }
@@ -245,10 +252,16 @@ const Catalog = () => {
   const exportPdf = async () => {
     if (exporting !== false || filtered.length === 0) return;
     setExporting("pdf");
+    setExportError(null);
     try {
       await toSpecimensPdf(filtered, images, {
         subtitle: `${filtered.length} specimen(s)`,
       });
+      toast.success(`PDF exported — ${filtered.length} specimen(s)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setExportError(`PDF export failed: ${msg}`);
+      toast.error("PDF export failed", { description: msg });
     } finally {
       setExporting(false);
     }
@@ -265,6 +278,8 @@ const Catalog = () => {
           <button
             onClick={exportCsv}
             disabled={exporting !== false || filtered.length === 0}
+            aria-busy={exporting === "csv"}
+            aria-label="Export specimens as CSV"
             data-testid="catalog-export-csv"
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
           >
@@ -273,11 +288,25 @@ const Catalog = () => {
           <button
             onClick={exportPdf}
             disabled={exporting !== false || filtered.length === 0}
+            aria-busy={exporting === "pdf"}
+            aria-label="Export specimens as PDF"
             data-testid="catalog-export-pdf"
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
           >
             {exporting === "pdf" ? "Exporting…" : "Export PDF"}
           </button>
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="catalog-export-status"
+            className={`type-label w-full ${exportError ? "text-warning-red" : "text-cream/80"}`}
+          >
+            {exporting === "csv"
+              ? "Preparing CSV export…"
+              : exporting === "pdf"
+                ? "Preparing PDF export…"
+                : exportError ?? ""}
+          </p>
           <button
             onClick={() => navigate("/catalog/stats")}
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
