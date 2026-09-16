@@ -168,21 +168,39 @@ async def main() -> None:
                 b.addEventListener('click', () => { window.__clicks++; });
             }"""
         )
-        # dispatch without awaiting so we can observe the in-flight state
+        # observe the in-flight state via a MutationObserver — a one-row export
+        # finishes faster than a Playwright round trip.
         await page.evaluate(
-            "() => document.querySelector('[data-testid=catalog-export-pdf]').click()"
+            """() => {
+                const csv = document.querySelector('[data-testid=catalog-export-csv]');
+                const pdf = document.querySelector('[data-testid=catalog-export-pdf]');
+                const st = document.querySelector('[data-testid=catalog-export-status]');
+                window.__seen = { csvDisabled: false, pdfDisabled: false, busy: false, note: '' };
+                const snap = () => {
+                    if (csv.disabled) window.__seen.csvDisabled = true;
+                    if (pdf.disabled) window.__seen.pdfDisabled = true;
+                    if (pdf.getAttribute('aria-busy') === 'true') window.__seen.busy = true;
+                    const t = (st.textContent || '').trim();
+                    if (t) window.__seen.note = t;
+                };
+                const obs = new MutationObserver(snap);
+                obs.observe(document.body, {
+                    subtree: true, childList: true, characterData: true, attributes: true,
+                });
+                window.__stop = () => obs.disconnect();
+                pdf.click();
+                snap();
+            }"""
         )
-        busy = await pdf_btn.get_attribute("aria-busy")
-        label = await pdf_btn.inner_text()
-        disabled_csv = await csv_btn.is_disabled()
-        note = await status.inner_text()
+        await page.wait_for_timeout(4000)
+        seen = await page.evaluate("() => { window.__stop(); return window.__seen; }")
+        check(seen["busy"], f"export: PDF button reports aria-busy while running ({seen})")
+        check(seen["csvDisabled"], "export: the other export button is disabled during an export")
+        check(seen["pdfDisabled"], "export: the running button is disabled (no duplicates)")
         check(
-            busy == "true" or "Exporting" in label,
-            f"export: PDF button shows a loading state while running ({label})",
+            "Preparing" in seen["note"],
+            f"export: status region announces progress ({seen['note']})",
         )
-        check(disabled_csv, "export: the other export button is disabled during an export")
-        check(await pdf_btn.is_disabled(), "export: the running button is disabled (no duplicates)")
-        check("Preparing" in note, f"export: status region announces progress ({note})")
 
         await page.wait_for_timeout(6000)
         check(
