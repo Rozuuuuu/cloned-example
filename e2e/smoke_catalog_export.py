@@ -168,7 +168,10 @@ async def main() -> None:
                 b.addEventListener('click', () => { window.__clicks++; });
             }"""
         )
-        await pdf_btn.click()
+        # dispatch without awaiting so we can observe the in-flight state
+        await page.evaluate(
+            "() => document.querySelector('[data-testid=catalog-export-pdf]').click()"
+        )
         busy = await pdf_btn.get_attribute("aria-busy")
         label = await pdf_btn.inner_text()
         disabled_csv = await csv_btn.is_disabled()
