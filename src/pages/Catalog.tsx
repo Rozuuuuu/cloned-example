@@ -278,6 +278,8 @@ const Catalog = () => {
           <button
             onClick={exportCsv}
             disabled={exporting !== false || filtered.length === 0}
+            aria-busy={exporting === "csv"}
+            aria-label="Export specimens as CSV"
             data-testid="catalog-export-csv"
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
           >
@@ -286,11 +288,25 @@ const Catalog = () => {
           <button
             onClick={exportPdf}
             disabled={exporting !== false || filtered.length === 0}
+            aria-busy={exporting === "pdf"}
+            aria-label="Export specimens as PDF"
             data-testid="catalog-export-pdf"
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage disabled:opacity-40"
           >
             {exporting === "pdf" ? "Exporting…" : "Export PDF"}
           </button>
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="catalog-export-status"
+            className={`type-label w-full ${exportError ? "text-warning-red" : "text-cream/80"}`}
+          >
+            {exporting === "csv"
+              ? "Preparing CSV export…"
+              : exporting === "pdf"
+                ? "Preparing PDF export…"
+                : exportError ?? ""}
+          </p>
           <button
             onClick={() => navigate("/catalog/stats")}
             className="type-label border-2 border-cream/60 px-3 py-2 text-cream transition-colors hover:bg-cream hover:text-deep-sage"
