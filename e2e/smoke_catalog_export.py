@@ -264,7 +264,7 @@ async def main() -> None:
         await row.first.wait_for(timeout=20000)
         async with page.expect_download(timeout=30000) as dl3:
             await page.get_by_test_id("catalog-export-csv").click()
-        check((await dl3.value).path() is not None, "recovery: CSV export works again after reload")
+        check(await (await dl3.value).path() is not None, "recovery: CSV export works again after reload")
 
         # --- cleanup --------------------------------------------------------------
         await page.reload(wait_until="domcontentloaded")
