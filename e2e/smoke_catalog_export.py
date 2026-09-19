@@ -210,15 +210,61 @@ async def main() -> None:
         check(not await pdf_btn.is_disabled(), "export: buttons re-enable when the export finishes")
 
         # --- error state ---------------------------------------------------------
+        # Breaking createObjectURL makes both CSV (downloadText) and PDF
+        # (jsPDF save) generation fail, exercising both error paths.
         await page.evaluate(
             "() => { URL.createObjectURL = () => { throw new Error('Blob boom'); }; }"
+        )
+        await page.evaluate(
+            """() => {
+                window.__toasts = [];
+                const obs = new MutationObserver(() => {
+                    document.querySelectorAll('[data-sonner-toast]').forEach((t) => {
+                        const txt = (t.textContent || '').trim();
+                        if (txt && !window.__toasts.includes(txt)) window.__toasts.push(txt);
+                    });
+                });
+                obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+                window.__stopToasts = () => obs.disconnect();
+            }"""
         )
         await csv_btn.click()
         await page.wait_for_timeout(1500)
         err = (await status.inner_text()).strip()
-        check("failed" in err.lower(), f"export: failures show a clear message ({err})")
-        check(not await csv_btn.is_disabled(), "export: buttons re-enable after a failure")
-        await page.screenshot(path=f"{OUT}/export-error.png")
+        check("failed" in err.lower(), f"csv error: clear message in the status region ({err})")
+        check("csv" in err.lower(), f"csv error: message names the failing export ({err})")
+        err_class = await status.get_attribute("class") or ""
+        check(
+            "warning-red" in err_class,
+            f"csv error: status is styled as an error ({err_class})",
+        )
+        check(not await csv_btn.is_disabled(), "csv error: button re-enables after a failure")
+        check(not await pdf_btn.is_disabled(), "csv error: the PDF button re-enables too")
+        await page.screenshot(path=f"{OUT}/export-error-csv.png")
+
+        await pdf_btn.click()
+        await page.wait_for_timeout(1500)
+        err2 = (await status.inner_text()).strip()
+        check("failed" in err2.lower(), f"pdf error: clear message in the status region ({err2})")
+        check("pdf" in err2.lower(), f"pdf error: message names the failing export ({err2})")
+        check(not await pdf_btn.is_disabled(), "pdf error: button re-enables after a failure")
+        toasts = await page.evaluate("() => { window.__stopToasts(); return window.__toasts; }")
+        check(
+            any("csv export failed" in t.lower() for t in toasts),
+            f"csv error: a failure toast is shown ({toasts})",
+        )
+        check(
+            any("pdf export failed" in t.lower() for t in toasts),
+            f"pdf error: a failure toast is shown ({toasts})",
+        )
+        await page.screenshot(path=f"{OUT}/export-error-pdf.png")
+
+        # restoring the API makes exports succeed again (no stuck error state)
+        await page.reload(wait_until="domcontentloaded")
+        await row.first.wait_for(timeout=20000)
+        async with page.expect_download(timeout=30000) as dl3:
+            await page.get_by_test_id("catalog-export-csv").click()
+        check(await (await dl3.value).path() is not None, "recovery: CSV export works again after reload")
 
         # --- cleanup --------------------------------------------------------------
         await page.reload(wait_until="domcontentloaded")
